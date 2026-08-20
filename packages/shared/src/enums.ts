@@ -1,0 +1,90 @@
+export enum UserRoleType {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
+  GERENTE = 'GERENTE',
+  CAIXA = 'CAIXA',
+  ESTOQUISTA = 'ESTOQUISTA',
+  VENDEDOR = 'VENDEDOR',
+  FINANCEIRO = 'FINANCEIRO',
+}
+
+export enum StockMovementType {
+  PURCHASE = 'PURCHASE',
+  SALE = 'SALE',
+  RETURN = 'RETURN',
+  ADJUSTMENT = 'ADJUSTMENT',
+  TRANSFER = 'TRANSFER',
+  LOSS = 'LOSS',
+  EXPIRED = 'EXPIRED',
+  DAMAGE = 'DAMAGE',
+  INITIAL_BALANCE = 'INITIAL_BALANCE',
+}
+
+export enum PaymentMethod {
+  CASH = 'CASH',
+  PIX = 'PIX',
+  DEBIT_CARD = 'DEBIT_CARD',
+  CREDIT_CARD = 'CREDIT_CARD',
+  STORE_CREDIT = 'STORE_CREDIT',
+  VOUCHER = 'VOUCHER',
+  OTHER = 'OTHER',
+}
+
+export enum SaleStatus {
+  COMPLETED = 'COMPLETED',
+  CANCELED = 'CANCELED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum CashSessionStatus {
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+}
+
+export enum CashMovementType {
+  OPENING = 'OPENING',
+  SALE = 'SALE',
+  SUPPLY = 'SUPPLY',
+  SANGRIA = 'SANGRIA',
+  REFUND = 'REFUND',
+  CLOSING = 'CLOSING',
+}
+
+export enum FiscalStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  AUTHORIZED = 'AUTHORIZED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+  CONTINGENCY = 'CONTINGENCY',
+}
+
+export enum FiscalType {
+  NFCE = 'NFCE',
+  NFE = 'NFE',
+  SAT = 'SAT',
+}
+
+export enum JobStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  DEAD = 'DEAD',
+}
+
+export enum InventoryCountStatus {
+  DRAFT = 'DRAFT',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  APPLIED = 'APPLIED',
+  CANCELED = 'CANCELED',
+}
+
+export enum PurchaseOrderStatus {
+  DRAFT = 'DRAFT',
+  SENT = 'SENT',
+  PARTIALLY_RECEIVED = 'PARTIALLY_RECEIVED',
+  RECEIVED = 'RECEIVED',
+  CANCELED = 'CANCELED',
+}

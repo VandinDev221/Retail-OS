@@ -1,0 +1,102 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  Boxes,
+  Truck,
+  Wallet,
+  FileSpreadsheet,
+  Settings,
+  Users,
+  LogOut,
+  Receipt,
+  Clock,
+} from 'lucide-react';
+import { useAuth } from '../../context/auth-context';
+import { cn } from '../../lib/utils';
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  const menuItems = [
+    { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
+    { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
+    { label: 'Controle de Caixa', icon: Wallet, href: '/cash' },
+    { label: 'Produtos & Catálogo', icon: Package, href: '/products' },
+    { label: 'Estoque & FEFO', icon: Boxes, href: '/inventory' },
+    { label: 'Compras & Entrada', icon: Truck, href: '/purchases' },
+    { label: 'Financeiro', icon: Receipt, href: '/finance' },
+    { label: 'Relatórios & ABC', icon: FileSpreadsheet, href: '/reports' },
+    { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
+  ];
+
+  return (
+    <aside className="w-64 bg-surface border-r border-surface-border flex flex-col justify-between h-screen sticky top-0">
+      <div>
+        {/* Brand Header */}
+        <div className="p-6 border-b border-surface-border flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-primary-500/20">
+            R
+          </div>
+          <div>
+            <h1 className="font-bold text-lg text-white tracking-wide">Retail OS</h1>
+            <p className="text-xs text-primary-400 font-medium">SaaS Conveniência</p>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-180px)]">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'bg-primary-500/15 text-primary-400 border border-primary-500/30'
+                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-card',
+                  item.highlight && !isActive && 'text-primary-400/90 font-semibold',
+                )}
+              >
+                <Icon className={cn('w-4 h-4', isActive ? 'text-primary-400' : 'text-zinc-400')} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* User Footer */}
+      <div className="p-4 border-t border-surface-border bg-surface-card/40">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-primary-400">
+              {user?.name?.slice(0, 2).toUpperCase() || 'US'}
+            </div>
+            <div className="truncate">
+              <p className="text-xs font-medium text-zinc-200 truncate">{user?.name || 'Operador'}</p>
+              <p className="text-[10px] text-zinc-400 truncate">{user?.role || 'CAIXA'}</p>
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition"
+            title="Sair"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}

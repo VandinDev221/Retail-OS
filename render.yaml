@@ -1,0 +1,29 @@
+services:
+  # API Backend (Render Free Web Service)
+  - type: web
+    name: retail-os-api
+    env: node
+    plan: free
+    region: ohio
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @retail-os/api build
+    startCommand: pnpm --filter @retail-os/api start:prod
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: INTERNAL_CRON_SECRET
+        generateValue: true
