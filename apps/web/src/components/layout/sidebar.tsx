@@ -28,15 +28,22 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
   const { user, logout } = useAuth();
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isCaixa = user?.role === 'CAIXA';
 
-  // Menu do Super Admin (Monitoramento de Plataforma, Logs, Empresas e Planos)
+  // Menu do Super Admin (Apenas Gestão de Empresas e Usuários da Plataforma)
   const superAdminMenuItems = [
-    { label: 'Visão Geral Plataforma', icon: LayoutDashboard, href: '/' },
-    { label: 'Empresas & Assinaturas', icon: Building, href: '/super-admin', highlight: true },
-    { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
+    { label: 'Empresas & Usuários', icon: Building, href: '/super-admin', highlight: true },
   ];
 
-  // Menu Operacional de Loja (Admins de Loja, Gerentes, Caixas)
+  // Menu do Caixa (Apenas Frente de Caixa, Controle de Caixa e Produtos)
+  const caixaMenuItems = [
+    { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
+    { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
+    { label: 'Controle de Caixa', icon: Wallet, href: '/cash' },
+    { label: 'Produtos & Catálogo', icon: Package, href: '/products' },
+  ];
+
+  // Menu Operacional de Loja (Admins e Gerentes)
   const storeMenuItems = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
     { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
@@ -50,7 +57,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
   ];
 
-  const menuItems = isSuperAdmin ? superAdminMenuItems : storeMenuItems;
+  const menuItems = isSuperAdmin ? superAdminMenuItems : (isCaixa ? caixaMenuItems : storeMenuItems);
 
   const content = (
     <div className="flex flex-col justify-between h-full bg-surface border-r border-surface-border">

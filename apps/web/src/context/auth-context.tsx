@@ -20,8 +20,8 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (data: { email: string; password: string; tenantSlug?: string }) => Promise<void>;
-  register: (data: { name: string; email: string; password: string; storeName?: string }) => Promise<void>;
-  loginWithGoogle: (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => Promise<void>;
+  register: (data: { name: string; email: string; password: string; storeName?: string; planSlug?: string; billingCycle?: 'MONTHLY' | 'YEARLY' }) => Promise<{ checkoutUrl?: string; message?: string }>;
+  loginWithGoogle: (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => Promise<{ checkoutUrl?: string; message?: string }>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
 }
@@ -60,8 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
   };
 
-  const register = async (data: { name: string; email: string; password: string; storeName?: string }) => {
+  const register = async (data: { name: string; email: string; password: string; storeName?: string; planSlug?: string; billingCycle?: 'MONTHLY' | 'YEARLY' }) => {
     const res = await api.post('/auth/register', data);
+    if (res.data.checkoutUrl) {
+      return { checkoutUrl: res.data.checkoutUrl, message: res.data.message };
+    }
     const { accessToken, refreshToken, user: userData } = res.data;
 
     setToken(accessToken);
@@ -70,10 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_token', accessToken);
     localStorage.setItem('retail_os_refresh_token', refreshToken);
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
+    return {};
   };
 
   const loginWithGoogle = async (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => {
     const res = await api.post('/auth/google', data);
+    if (res.data.checkoutUrl) {
+      return { checkoutUrl: res.data.checkoutUrl, message: res.data.message };
+    }
     const { accessToken, refreshToken, user: userData } = res.data;
 
     setToken(accessToken);
@@ -82,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_token', accessToken);
     localStorage.setItem('retail_os_refresh_token', refreshToken);
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
+    return {};
   };
 
   const logout = () => {

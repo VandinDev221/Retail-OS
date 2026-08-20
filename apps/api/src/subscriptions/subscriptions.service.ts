@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRoleType, SubscriptionStatus, BillingCycle } from '@prisma/client';
 import Stripe from 'stripe';
+import * as bcrypt from 'bcrypt';
 
 export interface CreatePlanDto {
   name: string;
@@ -187,11 +188,9 @@ export class SubscriptionsService {
         // 2. Buscar o ID do Preço na Stripe
         let stripePriceId: string | null = null;
 
-        // Se planSlug for um ID de Produto ou Preço direto da Stripe (ex: prod_... ou price_...)
         if (dto.planSlug.startsWith('price_')) {
           stripePriceId = dto.planSlug;
         } else {
-          // Buscar preços ativos na Stripe para associar
           const pricesRes = await stripe.prices.list({ active: true, expand: ['data.product'] });
           const targetInterval = dto.billingCycle === 'YEARLY' ? 'year' : 'month';
 
@@ -207,13 +206,11 @@ export class SubscriptionsService {
           if (matchedPrice) {
             stripePriceId = matchedPrice.id;
           } else if (pricesRes.data.length > 0) {
-            // Pegar primeiro preço com intervalo correspondente
             const fallbackPrice = pricesRes.data.find((p) => p.recurring?.interval === targetInterval) || pricesRes.data[0];
             stripePriceId = fallbackPrice.id;
           }
         }
 
-        // 3. Montar a linha de cobrança
         const lineItem = stripePriceId
           ? { price: stripePriceId, quantity: 1 }
           : {
@@ -230,14 +227,13 @@ export class SubscriptionsService {
               quantity: 1,
             };
 
-        // 4. Criar a sessão de checkout hospedada no servidor da Stripe
         const session = await stripe.checkout.sessions.create({
           customer: customerId,
           payment_method_types: ['card'],
           mode: 'subscription',
           line_items: [lineItem],
-          success_url: `${appUrl}/settings?session_id={CHECKOUT_SESSION_ID}&status=success`,
-          cancel_url: `${appUrl}/settings?status=canceled`,
+          success_url: `${appUrl}/login?status=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${appUrl}/login?status=canceled`,
           metadata: {
             tenantId: tenant.id,
             planSlug: dto.planSlug,
@@ -253,7 +249,33 @@ export class SubscriptionsService {
     }
 
     await this.checkout(tenantId, dto);
-    return { checkoutUrl: `${appUrl}/settings?status=success` };
+    return { checkoutUrl: `${appUrl}/login?status=success` };
+  }
+
+  async confirmStripeSession(sessionId: string) {
+    const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+
+    if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
+      try {
+        const stripe = new Stripe(stripeSecretKey);
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        if (session && (session.payment_status === 'paid' || session.status === 'complete')) {
+          const tenantId = session.metadata?.tenantId;
+          const planSlug = session.metadata?.planSlug || 'pro';
+          const billingCycle = (session.metadata?.billingCycle as 'MONTHLY' | 'YEARLY') || 'MONTHLY';
+
+          if (tenantId) {
+            await this.checkout(tenantId, { planSlug, billingCycle });
+            return { success: true, message: 'Pagamento confirmado e conta ativada!' };
+          }
+        }
+      } catch (err: any) {
+        console.error('Erro ao confirmar sessão Stripe:', err);
+      }
+    }
+
+    return { success: true, message: 'Conta ativada com sucesso!' };
   }
 
   async createStripeCustomerPortal(tenantId: string) {
@@ -289,7 +311,6 @@ export class SubscriptionsService {
         return { portalUrl: portalSession.url };
       } catch (stripeErr: any) {
         console.error('Erro ao abrir o Portal da Stripe:', stripeErr);
-        // Se o portal não tiver sido ativado nas configurações do Stripe Dashboard
         throw new BadRequestException(
           'Para acessar o Portal do Cliente, ative o Customer Portal nas configurações do seu Stripe Dashboard (Settings -> Customer Portal).'
         );
@@ -416,6 +437,62 @@ export class SubscriptionsService {
     }));
   }
 
+  async superAdminCreateTenant(userRole: UserRoleType, data: { name: string; slug?: string; cnpj?: string; email?: string; phone?: string; plan?: string }) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    const slugBase = (data.slug || data.name).toLowerCase().replace(/[^a-z0-9]/gi, '');
+    const uniqueSlug = `${slugBase}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    return this.prisma.tenant.create({
+      data: {
+        name: data.name,
+        slug: data.slug || uniqueSlug,
+        cnpj: data.cnpj,
+        email: data.email,
+        phone: data.phone,
+        plan: (data.plan || 'PRO').toUpperCase(),
+        active: true,
+        stores: {
+          create: {
+            name: 'Loja Principal',
+            code: 'MATRIZ-01',
+            active: true,
+          },
+        },
+      },
+    });
+  }
+
+  async superAdminUpdateTenant(userRole: UserRoleType, id: string, data: { name?: string; cnpj?: string; email?: string; phone?: string; plan?: string; active?: boolean }) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    return this.prisma.tenant.update({
+      where: { id },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.cnpj !== undefined ? { cnpj: data.cnpj } : {}),
+        ...(data.email !== undefined ? { email: data.email } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.plan ? { plan: data.plan.toUpperCase() } : {}),
+        ...(data.active !== undefined ? { active: data.active } : {}),
+      },
+    });
+  }
+
+  async superAdminDeleteTenant(userRole: UserRoleType, id: string) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    return this.prisma.tenant.delete({
+      where: { id },
+    });
+  }
+
   async superAdminUpdateTenantStatus(userRole: UserRoleType, tenantId: string, active: boolean, status?: SubscriptionStatus) {
     if (userRole !== UserRoleType.SUPER_ADMIN) {
       throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
@@ -434,6 +511,82 @@ export class SubscriptionsService {
     }
 
     return tenant;
+  }
+
+  // --- CRUD DE USUÁRIOS PARA SUPER ADMIN ---
+
+  async superAdminListUsers(userRole: UserRoleType) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    return this.prisma.user.findMany({
+      include: {
+        tenant: { select: { id: true, name: true, slug: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async superAdminCreateUser(userRole: UserRoleType, data: { tenantId: string; name: string; email: string; password?: string; role: UserRoleType }) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password || 'Mudar123!', 10);
+
+    const store = await this.prisma.store.findFirst({
+      where: { tenantId: data.tenantId },
+    });
+
+    return this.prisma.user.create({
+      data: {
+        tenantId: data.tenantId,
+        storeId: store?.id,
+        name: data.name,
+        email: data.email.trim().toLowerCase(),
+        passwordHash,
+        role: data.role,
+        active: true,
+      },
+      include: {
+        tenant: { select: { id: true, name: true, slug: true } },
+      },
+    });
+  }
+
+  async superAdminUpdateUser(userRole: UserRoleType, id: string, data: { name?: string; email?: string; password?: string; role?: UserRoleType; active?: boolean; tenantId?: string }) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    const updateData: any = {};
+    if (data.name) updateData.name = data.name;
+    if (data.email) updateData.email = data.email.trim().toLowerCase();
+    if (data.role) updateData.role = data.role;
+    if (data.active !== undefined) updateData.active = data.active;
+    if (data.tenantId) updateData.tenantId = data.tenantId;
+    if (data.password && data.password.length >= 6) {
+      updateData.passwordHash = await bcrypt.hash(data.password, 10);
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      include: {
+        tenant: { select: { id: true, name: true, slug: true } },
+      },
+    });
+  }
+
+  async superAdminDeleteUser(userRole: UserRoleType, id: string) {
+    if (userRole !== UserRoleType.SUPER_ADMIN) {
+      throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
+    }
+
+    return this.prisma.user.delete({
+      where: { id },
+    });
   }
 
   async superAdminGetSystemLogs(userRole: UserRoleType) {

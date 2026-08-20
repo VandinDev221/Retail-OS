@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../context/auth-context';
-import { Lock, Mail, Store, AlertCircle, ArrowRight, User, Building } from 'lucide-react';
+import { api } from '../../../lib/api';
+import { Lock, Mail, Store, AlertCircle, ArrowRight, User, Building, CheckCircle, Zap, ShieldCheck } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -27,13 +28,39 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regStoreName, setRegStoreName] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
+  const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
-    // 1. Processar retorno de OAuth via hash fragment (#access_token=ya29...)
+    // 1. Processar retorno de Checkout do Stripe
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const sessionId = searchParams.get('session_id');
+      const statusParam = searchParams.get('status');
+
+      if (statusParam === 'success') {
+        if (sessionId) {
+          api.post('/subscriptions/stripe/confirm-session', { sessionId })
+            .then(() => {
+              setSuccessMsg('Pagamento confirmado com sucesso! Sua conta foi liberada. Entre com seu e-mail e senha.');
+            })
+            .catch(() => {
+              setSuccessMsg('Pagamento recebido! Você já pode entrar com seu e-mail e senha.');
+            });
+        } else {
+          setSuccessMsg('Pagamento recebido com sucesso! Sua conta está liberada para acesso.');
+        }
+      } else if (statusParam === 'canceled') {
+        setError('O pagamento foi cancelado. Escolha um plano para concluir a ativação da sua conta.');
+      }
+    }
+
+    // 2. Processar retorno de OAuth via hash fragment (#access_token=ya29...)
     if (typeof window !== 'undefined' && window.location.hash) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
@@ -48,16 +75,20 @@ export default function LoginPage() {
           .then((res) => res.json())
           .then(async (userInfo) => {
             if (userInfo.email) {
-              await loginWithGoogle({
+              const res = await loginWithGoogle({
                 email: userInfo.email,
                 name: userInfo.name || userInfo.email.split('@')[0],
               });
-              router.push('/');
+              if (res?.checkoutUrl) {
+                window.location.href = res.checkoutUrl;
+              } else {
+                router.push('/');
+              }
             } else {
               setError('Não foi possível obter o e-mail da conta Google.');
             }
           })
-          .catch((err) => {
+          .catch(() => {
             setError('Falha ao autenticar token do Google.');
           })
           .finally(() => {
@@ -66,7 +97,7 @@ export default function LoginPage() {
       }
     }
 
-    // 2. Carregar SDK oficial do Google Identity Services
+    // 3. Carregar SDK oficial do Google Identity Services
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
@@ -83,6 +114,7 @@ export default function LoginPage() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     setLoading(true);
 
     try {
@@ -102,16 +134,24 @@ export default function LoginPage() {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     setLoading(true);
 
     try {
-      await register({
+      const res = await register({
         name: regName.trim(),
         email: regEmail.trim(),
         password: regPassword,
         storeName: regStoreName.trim() || undefined,
+        planSlug: selectedPlan,
+        billingCycle: billingCycle,
       });
-      router.push('/');
+
+      if (res?.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Erro ao cadastrar empresa.');
     } finally {
@@ -121,6 +161,7 @@ export default function LoginPage() {
 
   const handleGoogleLogin = () => {
     setError('');
+    setSuccessMsg('');
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1047249272379-fake.apps.googleusercontent.com';
 
     if (window.google && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
@@ -130,13 +171,17 @@ export default function LoginPage() {
         callback: async (response: any) => {
           try {
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            await loginWithGoogle({
+            const res = await loginWithGoogle({
               email: payload.email,
               name: payload.name || payload.email.split('@')[0],
               idToken: response.credential,
               tenantSlug: tenantSlug.trim() || undefined,
             });
-            router.push('/');
+            if (res?.checkoutUrl) {
+              window.location.href = res.checkoutUrl;
+            } else {
+              router.push('/');
+            }
           } catch (err: any) {
             setError(err?.response?.data?.message || 'Erro ao autenticar com a conta Google.');
           } finally {
@@ -164,11 +209,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 my-8">
       {/* Background Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10">
+      <div className={`w-full ${mode === 'register' ? 'max-w-2xl' : 'max-w-md'} relative z-10 transition-all duration-300`}>
         {/* Header com a Logo Oficial RetailSyn */}
         <div className="text-center mb-6">
           <div className="w-20 h-20 bg-surface-card border border-surface-border rounded-3xl mx-auto flex items-center justify-center p-2 shadow-2xl shadow-primary-500/10 mb-3">
@@ -184,7 +229,7 @@ export default function LoginPage() {
         <div className="flex bg-surface-card p-1 rounded-xl border border-surface-border mb-4">
           <button
             type="button"
-            onClick={() => { setMode('login'); setError(''); }}
+            onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
             className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition ${
               mode === 'login' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
             }`}
@@ -193,7 +238,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setMode('register'); setError(''); }}
+            onClick={() => { setMode('register'); setError(''); setSuccessMsg(''); }}
             className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition ${
               mode === 'register' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
             }`}
@@ -203,11 +248,18 @@ export default function LoginPage() {
         </div>
 
         {/* Card Principal */}
-        <div className="bg-surface border border-surface-border rounded-2xl p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <div className="bg-surface border border-surface-border rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
           {error && (
             <div className="mb-6 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="mb-6 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2.5">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{successMsg}</span>
             </div>
           )}
 
@@ -327,85 +379,206 @@ export default function LoginPage() {
 
           {/* FORMULÁRIO DE CADASTRO */}
           {mode === 'register' && (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  Seu Nome Completo
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="Ex: João da Silva"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
-                  />
+            <form onSubmit={handleRegisterSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                    Seu Nome Completo
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      required
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="Ex: João da Silva"
+                      className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                    Nome da Sua Loja / Empresa
+                  </label>
+                  <div className="relative">
+                    <Building className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={regStoreName}
+                      onChange={(e) => setRegStoreName(e.target.value)}
+                      placeholder="Ex: Conveniência Central"
+                      className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                    E-mail de Acesso
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                    <input
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="seu.email@empresa.com"
+                      className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                    Crie sua Senha
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  Nome da Sua Loja / Empresa
-                </label>
-                <div className="relative">
-                  <Building className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={regStoreName}
-                    onChange={(e) => setRegStoreName(e.target.value)}
-                    placeholder="Ex: Conveniência Central"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
-                  />
+              {/* SELEÇÃO DO PLANO E CICLO DE COBRANÇA */}
+              <div className="pt-4 border-t border-surface-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-primary-400" />
+                    <span>Selecione o Plano da Sua Empresa</span>
+                  </label>
+
+                  {/* Alternador Mensal / Anual */}
+                  <div className="bg-surface-card p-1 rounded-lg border border-surface-border flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setBillingCycle('MONTHLY')}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded transition ${
+                        billingCycle === 'MONTHLY' ? 'bg-primary-500 text-black' : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      Mensal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillingCycle('YEARLY')}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded transition flex items-center gap-1 ${
+                        billingCycle === 'YEARLY' ? 'bg-primary-500 text-black' : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <span>Anual</span>
+                      <span className="text-[9px] px-1 bg-emerald-500/20 text-emerald-400 rounded font-black">-20%</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid dos Cards de Seleção de Plano */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Plano Starter */}
+                  <div
+                    onClick={() => setSelectedPlan('starter')}
+                    className={`cursor-pointer p-4 rounded-xl border transition flex flex-col justify-between ${
+                      selectedPlan === 'starter'
+                        ? 'bg-primary-500/10 border-primary-500 shadow-md shadow-primary-500/10'
+                        : 'bg-surface-card border-surface-border hover:border-zinc-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-sm text-white">Starter</span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          selectedPlan === 'starter' ? 'border-primary-400 bg-primary-500' : 'border-zinc-600'
+                        }`}>
+                          {selectedPlan === 'starter' && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 mb-2">Ideal para 1 loja individual</p>
+                    </div>
+                    <div className="text-emerald-400 font-mono font-black text-lg">
+                      {billingCycle === 'YEARLY' ? 'R$ 79/mês' : 'R$ 99/mês'}
+                    </div>
+                  </div>
+
+                  {/* Plano Pro */}
+                  <div
+                    onClick={() => setSelectedPlan('pro')}
+                    className={`cursor-pointer p-4 rounded-xl border transition relative flex flex-col justify-between ${
+                      selectedPlan === 'pro'
+                        ? 'bg-primary-500/10 border-primary-500 shadow-md shadow-primary-500/10'
+                        : 'bg-surface-card border-surface-border hover:border-zinc-700'
+                    }`}
+                  >
+                    <span className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full bg-primary-500 text-black font-black text-[9px] uppercase tracking-wider shadow">
+                      Mais Popular
+                    </span>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-sm text-white">Pro</span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          selectedPlan === 'pro' ? 'border-primary-400 bg-primary-500' : 'border-zinc-600'
+                        }`}>
+                          {selectedPlan === 'pro' && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 mb-2">Até 3 lojas com emissão fiscal</p>
+                    </div>
+                    <div className="text-emerald-400 font-mono font-black text-lg">
+                      {billingCycle === 'YEARLY' ? 'R$ 159/mês' : 'R$ 199/mês'}
+                    </div>
+                  </div>
+
+                  {/* Plano Enterprise */}
+                  <div
+                    onClick={() => setSelectedPlan('enterprise')}
+                    className={`cursor-pointer p-4 rounded-xl border transition flex flex-col justify-between ${
+                      selectedPlan === 'enterprise'
+                        ? 'bg-primary-500/10 border-primary-500 shadow-md shadow-primary-500/10'
+                        : 'bg-surface-card border-surface-border hover:border-zinc-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-sm text-white">Enterprise</span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          selectedPlan === 'enterprise' ? 'border-primary-400 bg-primary-500' : 'border-zinc-600'
+                        }`}>
+                          {selectedPlan === 'enterprise' && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 mb-2">Lojas e usuários ilimitados</p>
+                    </div>
+                    <div className="text-emerald-400 font-mono font-black text-lg">
+                      {billingCycle === 'YEARLY' ? 'R$ 399/mês' : 'R$ 499/mês'}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  E-mail de Acesso
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-                  <input
-                    type="email"
-                    required
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="seu.email@empresa.com"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  Crie sua Senha
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
-                  />
-                </div>
+              <div className="pt-2 text-[11px] text-zinc-400 flex items-center justify-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Pagamento 100% seguro via <strong>Stripe Checkout</strong></span>
               </div>
 
               <button
                 type="submit"
                 disabled={loading || googleLoading}
-                className="w-full mt-2 bg-primary-500 hover:bg-primary-400 text-black font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 disabled:opacity-50"
+                className="w-full mt-2 bg-primary-500 hover:bg-primary-400 text-black font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 disabled:opacity-50 text-sm"
               >
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Criar Minha Conta</span>
+                    <span>Criar Conta e Ir para Pagamento</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

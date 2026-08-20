@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRoleType } from '@prisma/client';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 export interface LoginDto {
   email: string;
@@ -16,6 +17,8 @@ export interface RegisterDto {
   email: string;
   password: string;
   storeName?: string;
+  planSlug?: string;
+  billingCycle?: 'MONTHLY' | 'YEARLY';
 }
 
 export interface GoogleAuthDto {
@@ -32,6 +35,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -61,7 +65,7 @@ export class AuthService {
     }
 
     if (!user.tenant.active) {
-      throw new UnauthorizedException('Empresa desativada.');
+      throw new UnauthorizedException('Sua conta possui pendência de pagamento ou está inativa. Conclua o pagamento do plano para liberar o acesso ao sistema.');
     }
 
     return this.generateAuthResponse(user);
@@ -70,6 +74,8 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name.trim();
+    const planSlug = dto.planSlug || 'pro';
+    const billingCycle = dto.billingCycle || 'MONTHLY';
 
     if (!email || !dto.password || dto.password.length < 6) {
       throw new BadRequestException('Informe um e-mail válido e senha com no mínimo 6 caracteres.');
@@ -94,8 +100,8 @@ export class AuthService {
       data: {
         name: storeName,
         slug: uniqueSlug,
-        plan: 'PRO',
-        active: true,
+        plan: planSlug.toUpperCase(),
+        active: false, // Inativo até a confirmação do pagamento
         stores: {
           create: {
             name: 'Loja Principal',
@@ -111,7 +117,7 @@ export class AuthService {
 
     const store = tenant.stores[0];
 
-    const user = await this.prisma.user.create({
+    await this.prisma.user.create({
       data: {
         tenantId: tenant.id,
         storeId: store.id,
@@ -126,7 +132,17 @@ export class AuthService {
       },
     });
 
-    return this.generateAuthResponse(user);
+    // Criar Sessão do Stripe Checkout para o plano selecionado
+    const checkoutRes = await this.subscriptionsService.createStripeCheckoutSession(tenant.id, {
+      planSlug,
+      billingCycle,
+    });
+
+    return {
+      message: 'Conta registrada com sucesso! Efetue o pagamento para liberar seu acesso ao sistema.',
+      checkoutUrl: checkoutRes.checkoutUrl,
+      tenantId: tenant.id,
+    };
   }
 
   async googleAuth(dto: GoogleAuthDto) {
@@ -145,7 +161,7 @@ export class AuthService {
       },
     });
 
-    // Se o usuário não existir, cria a Conta / Tenant automaticamente ("Cadastrar com Google")
+    // Se o usuário não existir, cria a Conta / Tenant em estado inativo e redireciona para o Checkout
     if (!user) {
       const slugBase = email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase();
       const uniqueSlug = `${slugBase}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -155,7 +171,7 @@ export class AuthService {
           name: `Loja ${name}`,
           slug: uniqueSlug,
           plan: 'PRO',
-          active: true,
+          active: false, // Inativo até confirmação de pagamento
           stores: {
             create: {
               name: 'Loja Principal',
@@ -186,10 +202,21 @@ export class AuthService {
           tenant: true,
         },
       });
+
+      const checkoutRes = await this.subscriptionsService.createStripeCheckoutSession(tenant.id, {
+        planSlug: 'pro',
+        billingCycle: 'MONTHLY',
+      });
+
+      return {
+        message: 'Conta Google criada com sucesso! Conclua o pagamento para liberar seu acesso.',
+        checkoutUrl: checkoutRes.checkoutUrl,
+        tenantId: tenant.id,
+      };
     }
 
     if (!user.tenant.active) {
-      throw new UnauthorizedException('Empresa desativada');
+      throw new UnauthorizedException('Sua conta possui pendência de pagamento ou está inativa. Conclua o pagamento do plano para liberar o acesso ao sistema.');
     }
 
     return this.generateAuthResponse(user);
