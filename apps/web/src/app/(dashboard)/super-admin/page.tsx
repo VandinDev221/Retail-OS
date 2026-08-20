@@ -571,7 +571,7 @@ export default function SuperAdminPlatformPage() {
                 <ul className="text-xs text-zinc-300 space-y-2">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
-                    <span>{plan.maxStores >= 999 ? 'Lojas Ilimitadas' : `Até ${plan.maxStores} Lojas`}</span>
+                    <span>{plan.maxStores >= 999 ? 'Lojas Ilimitadas' : `Até ${plan.maxStores} ${plan.maxStores === 1 ? 'Loja' : 'Lojas'}`}</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-3.5 h-3.5 text-primary-400" />

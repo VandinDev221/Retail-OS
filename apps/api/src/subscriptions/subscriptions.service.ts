@@ -36,34 +36,34 @@ export class SubscriptionsService {
     return new StripeClass(stripeSecretKey);
   }
 
-  // Listar Planos Ativos (Garantindo estritamente os 3 planos oficiais com preços e IDs oficiais)
+  // Listar Planos Ativos (Garantindo estritamente os 3 planos oficiais sem duplicidade)
   async getPlans() {
     const OFFICIAL_PLANS: Record<string, any> = {
       starter: {
         id: 'prod_V6bw5XekJTmQMD',
         name: 'RetailSyn Plano Starter',
         slug: 'starter',
-        description: 'Ideal para 1 loja de conveniência ou minimercado individual.',
+        description: 'Ideal para 1 loja de conveniência ou minimercado.',
         priceMonthly: 159.99,
         priceYearly: 1499.99,
         stripePriceIdMonthly: null,
         stripePriceIdYearly: null,
         maxStores: 1,
-        maxUsers: 3,
-        maxProducts: 1000,
+        maxUsers: 5,
+        maxProducts: 5000,
       },
       pro: {
         id: 'prod_V6cdBztmqGbm0M',
         name: 'RetailSyn Plano Pro',
         slug: 'pro',
-        description: 'Para redes de até 3 lojas',
+        description: 'Para redes de até 3 lojas com módulo fiscal.',
         priceMonthly: 249.99,
         priceYearly: 1999.99,
         stripePriceIdMonthly: null,
         stripePriceIdYearly: null,
         maxStores: 3,
-        maxUsers: 10,
-        maxProducts: 1000,
+        maxUsers: 30,
+        maxProducts: 10000,
       },
       enterprise: {
         id: 'prod_V6qvsckVceq3q9',
@@ -71,11 +71,11 @@ export class SubscriptionsService {
         slug: 'enterprise',
         description: 'Ideal para grandes redes, lojas e usuários ilimitados.',
         priceMonthly: 499.99,
-        priceYearly: 3799.99,
+        priceYearly: 3999.99,
         stripePriceIdMonthly: null,
         stripePriceIdYearly: null,
-        maxStores: 999,
-        maxUsers: 999,
+        maxStores: 10,
+        maxUsers: 100,
         maxProducts: 999999,
       },
     };
