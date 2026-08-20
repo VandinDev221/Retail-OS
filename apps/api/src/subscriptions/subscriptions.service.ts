@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRoleType, SubscriptionStatus, BillingCycle } from '@prisma/client';
+import Stripe from 'stripe';
 
 export interface CreatePlanDto {
   name: string;
@@ -28,14 +29,13 @@ export class SubscriptionsService {
     private configService: ConfigService,
   ) {}
 
-  // Listar Planos Ativos (Buscando dinamicamente da Stripe se configurada)
+  // Listar Planos Ativos (Buscando dinamicamente da API da Stripe se a chave estiver presente)
   async getPlans() {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
 
-    if (stripeSecretKey && !stripeSecretKey.includes('mock')) {
+    if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
       try {
-        const Stripe = require('stripe');
-        const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+        const stripe = new Stripe(stripeSecretKey);
 
         const prices = await stripe.prices.list({
           expand: ['data.product'],
@@ -47,7 +47,7 @@ export class SubscriptionsService {
 
           prices.data.forEach((p: any) => {
             const product = p.product;
-            if (!product || !product.active) return;
+            if (!product || typeof product === 'string' || !product.active) return;
 
             const productId = product.id;
             if (!productsMap.has(productId)) {
@@ -80,10 +80,13 @@ export class SubscriptionsService {
             }
           });
 
-          return Array.from(productsMap.values());
+          const stripeList = Array.from(productsMap.values());
+          if (stripeList.length > 0) {
+            return stripeList;
+          }
         }
       } catch (stripeErr) {
-        // Em caso de falha de API, fallback para o banco local
+        console.error('Erro ao buscar planos diretamente da API da Stripe:', stripeErr);
       }
     }
 
@@ -135,7 +138,7 @@ export class SubscriptionsService {
       const defaultPlan = await this.prisma.plan.findFirst({ where: { slug: 'pro' } });
       if (defaultPlan) {
         const now = new Date();
-        const end = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 dias trial
+        const end = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
 
         sub = await this.prisma.subscription.create({
           data: {
@@ -160,17 +163,13 @@ export class SubscriptionsService {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Empresa não encontrada');
 
-    // Tentar localizar o plano no banco ou buscar da Stripe
     let plan = await this.prisma.plan.findUnique({ where: { slug: dto.planSlug } });
-
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
 
-    if (stripeSecretKey && !stripeSecretKey.includes('mock')) {
-      const Stripe = require('stripe');
-      const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+    if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
+      const stripe = new Stripe(stripeSecretKey);
 
-      // Obter ou criar Cliente na Stripe
       let customerId = tenant.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
@@ -191,7 +190,6 @@ export class SubscriptionsService {
           : plan.stripePriceIdMonthly
         : null;
 
-      // Criar Sessão de Checkout da Stripe
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ['card'],
@@ -228,12 +226,10 @@ export class SubscriptionsService {
       return { checkoutUrl: session.url };
     }
 
-    // Modo Simulado (Direct Activation) caso Stripe esteja em homologação sem secret key
     await this.checkout(tenantId, dto);
     return { checkoutUrl: `${appUrl}/settings?status=success` };
   }
 
-  // Criar Portal do Cliente na Stripe (Para alterar cartão ou cancelar assinatura)
   async createStripeCustomerPortal(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant || !tenant.stripeCustomerId) {
@@ -243,9 +239,8 @@ export class SubscriptionsService {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
 
-    if (stripeSecretKey && !stripeSecretKey.includes('mock')) {
-      const Stripe = require('stripe');
-      const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+    if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
+      const stripe = new Stripe(stripeSecretKey);
 
       const portalSession = await stripe.billingPortal.sessions.create({
         customer: tenant.stripeCustomerId,
@@ -258,7 +253,6 @@ export class SubscriptionsService {
     return { portalUrl: `${appUrl}/settings` };
   }
 
-  // Webhook Oficial da Stripe para ativação automática de pagamentos
   async handleStripeWebhook(event: any) {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -286,7 +280,6 @@ export class SubscriptionsService {
     return { received: true };
   }
 
-  // Trocar / Assinar Plano (Direto / Webhook)
   async checkout(tenantId: string, dto: CheckoutSubscriptionDto) {
     let plan = await this.prisma.plan.findUnique({
       where: { slug: dto.planSlug },
