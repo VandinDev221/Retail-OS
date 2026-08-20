@@ -344,6 +344,7 @@ export class AuthService {
     });
 
     if (role === UserRoleType.GERENTE) {
+      permissionsSet.add('settings:manage');
       permissionsSet.add('reports:sales');
       permissionsSet.add('reports:stock');
       permissionsSet.add('stock:read');

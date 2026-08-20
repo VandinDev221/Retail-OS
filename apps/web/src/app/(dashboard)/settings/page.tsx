@@ -16,6 +16,8 @@ import {
   CheckCircle,
   ExternalLink,
   Crown,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -38,6 +40,34 @@ export default function SettingsPage() {
     queryFn: async () => {
       const res = await api.get('/tenants/current');
       return res.data;
+    },
+  });
+
+  const [tenantForm, setTenantForm] = useState({
+    name: '',
+    cnpj: '',
+    email: '',
+    phone: '',
+  });
+
+  React.useEffect(() => {
+    if (tenant) {
+      setTenantForm({
+        name: tenant.name || '',
+        cnpj: tenant.cnpj || '',
+        email: tenant.email || '',
+        phone: tenant.phone || '',
+      });
+    }
+  }, [tenant]);
+
+  const updateTenantMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return api.patch('/tenants/current', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-info'] });
+      alert('Dados da empresa atualizados com sucesso!');
     },
   });
 
@@ -66,9 +96,12 @@ export default function SettingsPage() {
     enabled: tab === 'audit' && isSuperAdmin,
   });
 
+  const [portalError, setPortalError] = useState<string | null>(null);
+
   // Mutation para Checkout na Stripe
   const stripeCheckoutMutation = useMutation({
     mutationFn: async (planSlug: string) => {
+      setPortalError(null);
       const res = await api.post('/subscriptions/stripe/create-checkout-session', {
         planSlug,
         billingCycle,
@@ -80,11 +113,18 @@ export default function SettingsPage() {
         window.location.href = data.checkoutUrl;
       }
     },
+    onError: (err: any) => {
+      setPortalError(
+        err?.response?.data?.message ||
+          'Não foi possível iniciar o checkout da Stripe. Verifique as chaves de API da Stripe.'
+      );
+    },
   });
 
   // Mutation para abrir Portal do Cliente na Stripe
   const stripePortalMutation = useMutation({
     mutationFn: async () => {
+      setPortalError(null);
       const res = await api.post('/subscriptions/stripe/portal-session');
       return res.data;
     },
@@ -92,6 +132,12 @@ export default function SettingsPage() {
       if (data.portalUrl) {
         window.location.href = data.portalUrl;
       }
+    },
+    onError: (err: any) => {
+      setPortalError(
+        err?.response?.data?.message ||
+          'Para liberar o Portal de Faturas, ative a opção "Customer Portal" no seu painel da Stripe (Stripe Dashboard -> Settings -> Customer Portal).'
+      );
     },
   });
 
@@ -198,28 +244,99 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ABA TENANT */}
+      {/* ABA DADOS CADASTRAIS DA EMPRESA */}
       {tab === 'tenant' && (
-        <div className="bg-surface border border-surface-border rounded-2xl p-6 shadow-xl max-w-2xl space-y-4">
-          <h3 className="text-base font-bold text-white">Dados Cadastrais da Empresa</h3>
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            <div className="p-3 bg-surface-card rounded-xl border border-surface-border">
-              <span className="text-zinc-400 font-semibold">Razão Social / Nome:</span>
-              <p className="text-sm font-bold text-zinc-100 mt-1">{tenant?.name}</p>
+        <div className="bg-surface border border-surface-border rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex justify-between items-center pb-4 border-b border-surface-border">
+            <div>
+              <h2 className="text-lg font-bold text-white">Dados Cadastrais da Empresa</h2>
+              <p className="text-xs text-zinc-400">Edite as informações cadastrais da sua empresa (Disponível para Gerentes e Administradores)</p>
             </div>
-            <div className="p-3 bg-surface-card rounded-xl border border-surface-border">
-              <span className="text-zinc-400 font-semibold">Slug do Tenant:</span>
-              <p className="text-sm font-mono font-bold text-primary-400 mt-1">{tenant?.slug}</p>
-            </div>
-            <div className="p-3 bg-surface-card rounded-xl border border-surface-border">
-              <span className="text-zinc-400 font-semibold">CNPJ:</span>
-              <p className="text-sm font-mono text-zinc-200 mt-1">{tenant?.cnpj || 'Não informado'}</p>
-            </div>
-            <div className="p-3 bg-surface-card rounded-xl border border-surface-border">
-              <span className="text-zinc-400 font-semibold">Plano SaaS:</span>
-              <p className="text-sm font-bold text-emerald-400 mt-1">{subscription?.plan?.name || tenant?.plan}</p>
-            </div>
+            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-extrabold text-[10px] uppercase border border-emerald-500/20">
+              {tenant?.plan || 'PLANO PRO'}
+            </span>
           </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateTenantMutation.mutate(tenantForm);
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Razão Social / Nome da Empresa</label>
+                <input
+                  type="text"
+                  required
+                  value={tenantForm.name}
+                  onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">
+                  Slug do Tenant <span className="text-[10px] text-zinc-500 font-normal">(Gerado automaticamente - Não editável)</span>
+                </label>
+                <div className="w-full bg-surface-card/50 border border-surface-border/50 rounded-xl px-3.5 py-2.5 text-xs text-amber-400 font-mono font-bold cursor-not-allowed select-none flex items-center justify-between">
+                  <span>{tenant?.slug || 'loja-matriz'}</span>
+                  <span className="text-[10px] uppercase font-sans text-zinc-500 border border-zinc-700 rounded px-1.5 py-0.5">Automático</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">CNPJ</label>
+                <input
+                  type="text"
+                  value={tenantForm.cnpj}
+                  onChange={(e) => setTenantForm({ ...tenantForm, cnpj: e.target.value })}
+                  placeholder="00.000.000/0000-00"
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">E-mail de Contato da Empresa</label>
+                <input
+                  type="email"
+                  value={tenantForm.email}
+                  onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Telefone / WhatsApp</label>
+                <input
+                  type="text"
+                  value={tenantForm.phone}
+                  onChange={(e) => setTenantForm({ ...tenantForm, phone: e.target.value })}
+                  placeholder="(00) 00000-0000"
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">Plano Atual Contratado</label>
+                <div className="w-full bg-surface-card/50 border border-surface-border/50 rounded-xl px-3.5 py-2.5 text-xs text-emerald-400 font-bold flex items-center justify-between">
+                  <span>{tenant?.plan || 'PRO'}</span>
+                  <span className="text-[10px] text-zinc-400 font-normal">SaaS Ativo</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-surface-border">
+              <button
+                type="submit"
+                disabled={updateTenantMutation.isPending}
+                className="px-5 py-2.5 bg-primary-500 hover:bg-primary-400 text-black font-extrabold rounded-xl text-xs transition shadow-lg flex items-center gap-2"
+              >
+                {updateTenantMutation.isPending ? 'Salvando Alterações...' : 'Salvar Dados da Empresa'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

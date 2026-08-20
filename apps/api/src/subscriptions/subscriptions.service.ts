@@ -279,8 +279,12 @@ export class SubscriptionsService {
   }
 
   async createStripeCustomerPortal(tenantId: string) {
+    if (!tenantId) {
+      throw new BadRequestException('Usuário não possui uma empresa/loja vinculada para gerenciar assinatura.');
+    }
+
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) throw new NotFoundException('Empresa não encontrada');
+    if (!tenant) throw new NotFoundException('Empresa não encontrada.');
 
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
@@ -303,16 +307,40 @@ export class SubscriptionsService {
           });
         }
 
-        const portalSession = await stripe.billingPortal.sessions.create({
-          customer: customerId,
-          return_url: `${appUrl}/settings`,
-        });
+        try {
+          const portalSession = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${appUrl}/settings`,
+          });
+          return { portalUrl: portalSession.url };
+        } catch (portalErr: any) {
+          // Se o customerId não for encontrado na conta/ambiente atual do Stripe, recria o cliente e tenta novamente
+          if (portalErr?.code === 'resource_missing' || portalErr?.message?.includes('No such customer')) {
+            const newCustomer = await stripe.customers.create({
+              email: tenant.email || undefined,
+              name: tenant.name,
+              metadata: { tenantId: tenant.id, tenantSlug: tenant.slug },
+            });
+            customerId = newCustomer.id;
+            await this.prisma.tenant.update({
+              where: { id: tenant.id },
+              data: { stripeCustomerId: customerId },
+            });
 
-        return { portalUrl: portalSession.url };
+            const portalSession = await stripe.billingPortal.sessions.create({
+              customer: customerId,
+              return_url: `${appUrl}/settings`,
+            });
+            return { portalUrl: portalSession.url };
+          }
+          throw portalErr;
+        }
       } catch (stripeErr: any) {
-        console.error('Erro ao abrir o Portal da Stripe:', stripeErr);
+        console.error('Erro ao abrir o Portal da Stripe:', stripeErr?.message || stripeErr);
         throw new BadRequestException(
-          'Para acessar o Portal do Cliente, ative o Customer Portal nas configurações do seu Stripe Dashboard (Settings -> Customer Portal).'
+          stripeErr?.response?.message ||
+            stripeErr?.message ||
+            'Para acessar o Portal do Cliente, ative o Customer Portal nas configurações do seu Stripe Dashboard (Settings -> Billing -> Customer Portal).'
         );
       }
     }
