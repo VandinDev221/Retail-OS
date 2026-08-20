@@ -30,7 +30,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry && typeof window !== 'undefined') {
+    if (
+      (error.response?.status === 401 || error.response?.status === 403) &&
+      !originalRequest._retry &&
+      typeof window !== 'undefined'
+    ) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('retail_os_refresh_token');
 
