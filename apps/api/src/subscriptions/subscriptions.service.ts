@@ -30,13 +30,18 @@ export class SubscriptionsService {
     private configService: ConfigService,
   ) {}
 
+  private getStripeClient(stripeSecretKey: string): Stripe {
+    const StripeClass = (Stripe as any).default || Stripe;
+    return new StripeClass(stripeSecretKey);
+  }
+
   // Listar Planos Ativos (Buscando dinamicamente da API da Stripe)
   async getPlans() {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
       try {
-        const stripe = new Stripe(stripeSecretKey);
+        const stripe = this.getStripeClient(stripeSecretKey);
 
         const [productsRes, pricesRes] = await Promise.all([
           stripe.products.list({ active: true }),
@@ -168,7 +173,7 @@ export class SubscriptionsService {
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
       try {
-        const stripe = new Stripe(stripeSecretKey);
+        const stripe = this.getStripeClient(stripeSecretKey);
 
         // 1. Obter ou criar Cliente na Stripe
         let customerId = tenant.stripeCustomerId;
@@ -257,7 +262,7 @@ export class SubscriptionsService {
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
       try {
-        const stripe = new Stripe(stripeSecretKey);
+        const stripe = this.getStripeClient(stripeSecretKey);
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (session && (session.payment_status === 'paid' || session.status === 'complete')) {
@@ -291,7 +296,7 @@ export class SubscriptionsService {
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
       try {
-        const stripe = new Stripe(stripeSecretKey);
+        const stripe = this.getStripeClient(stripeSecretKey);
 
         let customerId = tenant.stripeCustomerId;
         if (!customerId) {
