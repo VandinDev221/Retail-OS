@@ -20,6 +20,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (data: { email: string; password: string; tenantSlug?: string }) => Promise<void>;
+  register: (data: { name: string; email: string; password: string; storeName?: string }) => Promise<void>;
   loginWithGoogle: (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
@@ -59,6 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
   };
 
+  const register = async (data: { name: string; email: string; password: string; storeName?: string }) => {
+    const res = await api.post('/auth/register', data);
+    const { accessToken, refreshToken, user: userData } = res.data;
+
+    setToken(accessToken);
+    setUser(userData);
+
+    localStorage.setItem('retail_os_token', accessToken);
+    localStorage.setItem('retail_os_refresh_token', refreshToken);
+    localStorage.setItem('retail_os_user', JSON.stringify(userData));
+  };
+
   const loginWithGoogle = async (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => {
     const res = await api.post('/auth/google', data);
     const { accessToken, refreshToken, user: userData } = res.data;
@@ -87,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, logout, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

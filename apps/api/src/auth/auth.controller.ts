@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthService, LoginDto, GoogleAuthDto } from './auth.service';
+import { AuthService, LoginDto, RegisterDto, GoogleAuthDto } from './auth.service';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { RateLimitService } from '../infrastructure/rate-limit.service';
@@ -18,9 +18,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Login com email e senha' })
   async login(@Body() dto: LoginDto, @Req() req: any) {
     const ip = req.ip || '127.0.0.1';
-    // Rate limit agressivo para proteção contra brute-force
     await this.rateLimitService.checkLimit(`login:${ip}:${dto.email}`, 10, 60);
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Post('register')
+  @ApiOperation({ summary: 'Cadastrar nova loja / empresa com e-mail e senha' })
+  async register(@Body() dto: RegisterDto, @Req() req: any) {
+    const ip = req.ip || '127.0.0.1';
+    await this.rateLimitService.checkLimit(`register:${ip}`, 5, 60);
+    return this.authService.register(dto);
   }
 
   @Public()

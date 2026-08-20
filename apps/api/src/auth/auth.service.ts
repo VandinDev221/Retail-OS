@@ -11,6 +11,13 @@ export interface LoginDto {
   tenantSlug?: string;
 }
 
+export interface RegisterDto {
+  name: string;
+  email: string;
+  password: string;
+  storeName?: string;
+}
+
 export interface GoogleAuthDto {
   email: string;
   name: string;
@@ -43,19 +50,81 @@ export class AuthService {
     });
 
     if (!users || users.length === 0) {
-      throw new UnauthorizedException('Credenciais inválidas ou conta inativa');
+      throw new UnauthorizedException('E-mail ou senha incorretos. Caso seja seu primeiro acesso, clique na aba "Criar Conta".');
     }
 
     const user = users[0];
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('E-mail ou senha incorretos.');
     }
 
     if (!user.tenant.active) {
-      throw new UnauthorizedException('Empresa desativada');
+      throw new UnauthorizedException('Empresa desativada.');
     }
+
+    return this.generateAuthResponse(user);
+  }
+
+  async register(dto: RegisterDto) {
+    const email = dto.email.trim().toLowerCase();
+    const name = dto.name.trim();
+
+    if (!email || !dto.password || dto.password.length < 6) {
+      throw new BadRequestException('Informe um e-mail válido e senha com no mínimo 6 caracteres.');
+    }
+
+    // Verificar se e-mail já existe
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Este e-mail já está cadastrado. Utilize a opção Entrar.');
+    }
+
+    const storeName = dto.storeName?.trim() || `Loja de ${name}`;
+    const slugBase = email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const uniqueSlug = `${slugBase}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const tenant = await this.prisma.tenant.create({
+      data: {
+        name: storeName,
+        slug: uniqueSlug,
+        plan: 'PRO',
+        active: true,
+        stores: {
+          create: {
+            name: 'Loja Principal',
+            code: 'MATRIZ-01',
+            active: true,
+          },
+        },
+      },
+      include: {
+        stores: true,
+      },
+    });
+
+    const store = tenant.stores[0];
+
+    const user = await this.prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        storeId: store.id,
+        email,
+        name,
+        role: UserRoleType.ADMIN,
+        passwordHash,
+        active: true,
+      },
+      include: {
+        tenant: true,
+      },
+    });
 
     return this.generateAuthResponse(user);
   }
