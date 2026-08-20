@@ -1,9 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../context/auth-context';
 import { Lock, Mail, Store, AlertCircle, ArrowRight } from 'lucide-react';
+
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +21,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Carregar a biblioteca oficial do Google Identity Services
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,30 +54,46 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
     setError('');
-    setGoogleLoading(true);
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
-    try {
-      // Solicitar e-mail do usuário se for um novo cadastro rápido via prompt amigável
-      const userEmail = prompt('Informe seu e-mail do Google para entrar/cadastrar:');
-      if (!userEmail) {
-        setGoogleLoading(false);
-        return;
-      }
-
-      const userName = userEmail.split('@')[0];
-      await loginWithGoogle({
-        email: userEmail.trim(),
-        name: userName,
-        tenantSlug: tenantSlug.trim() || undefined,
+    if (window.google && clientId) {
+      setGoogleLoading(true);
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (response: any) => {
+          try {
+            // Decodificar o ID token do Google
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            await loginWithGoogle({
+              email: payload.email,
+              name: payload.name || payload.email.split('@')[0],
+              idToken: response.credential,
+              tenantSlug: tenantSlug.trim() || undefined,
+            });
+            router.push('/');
+          } catch (err: any) {
+            setError(err?.response?.data?.message || 'Erro ao autenticar com a conta Google.');
+          } finally {
+            setGoogleLoading(false);
+          }
+        },
       });
 
-      router.push('/');
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Erro ao autenticar com a conta Google.');
-    } finally {
-      setGoogleLoading(false);
+      window.google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // Fallback para login seguro via OAuth redirect / consentimento
+          const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+            window.location.origin + '/login'
+          )}&response_type=token&scope=email%20profile`;
+          
+          window.location.href = authUrl;
+        }
+      });
+    } else {
+      // Se ainda não houver CLIENT_ID configurado nas envs
+      setError('Configuração do Google Client ID pendente nas variáveis da Vercel.');
     }
   };
 
@@ -86,7 +121,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Botão de Autenticação com o Google */}
+          {/* Botão Oficial do Google */}
           <button
             type="button"
             onClick={handleGoogleLogin}
