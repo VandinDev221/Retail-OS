@@ -522,8 +522,67 @@ export class SubscriptionsService {
       throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
     }
 
-    return this.prisma.tenant.delete({
-      where: { id },
+    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) throw new NotFoundException('Empresa não encontrada.');
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Documentos Fiscais, Vendas e Pagamentos
+      await tx.fiscalDocument.deleteMany({ where: { tenantId: id } });
+      await tx.saleReturnItem.deleteMany({ where: { tenantId: id } });
+      await tx.saleReturn.deleteMany({ where: { tenantId: id } });
+      await tx.salePayment.deleteMany({ where: { tenantId: id } });
+      await tx.saleItem.deleteMany({ where: { tenantId: id } });
+      await tx.sale.deleteMany({ where: { tenantId: id } });
+
+      // 2. Movimentações e Sessões de Caixa
+      await tx.cashMovement.deleteMany({ where: { tenantId: id } });
+      await tx.cashSession.deleteMany({ where: { tenantId: id } });
+      await tx.cashRegister.deleteMany({ where: { tenantId: id } });
+
+      // 3. Contas a Pagar e Contas a Receber
+      await tx.accountPayable.deleteMany({ where: { tenantId: id } });
+      await tx.accountReceivable.deleteMany({ where: { tenantId: id } });
+
+      // 4. Inventários, Pedidos de Compra e Recebimento de Mercadorias
+      await tx.inventoryCountItem.deleteMany({ where: { tenantId: id } });
+      await tx.inventoryCount.deleteMany({ where: { tenantId: id } });
+      await tx.goodsReceiptItem.deleteMany({ where: { tenantId: id } });
+      await tx.goodsReceipt.deleteMany({ where: { tenantId: id } });
+      await tx.purchaseOrderItem.deleteMany({ where: { tenantId: id } });
+      await tx.purchaseOrder.deleteMany({ where: { tenantId: id } });
+
+      // 5. Movimentações, Lotes e Balanço de Estoque
+      await tx.stockMovement.deleteMany({ where: { tenantId: id } });
+      await tx.stockLot.deleteMany({ where: { tenantId: id } });
+      await tx.stockBalance.deleteMany({ where: { tenantId: id } });
+      await tx.stockLocation.deleteMany({ where: { tenantId: id } });
+
+      // 6. Catálogo (Produtos, Códigos de Barras, Categorias, Marcas, Unidades, Fornecedores, Clientes)
+      await tx.productBarcode.deleteMany({ where: { tenantId: id } });
+      await tx.product.deleteMany({ where: { tenantId: id } });
+      await tx.category.deleteMany({ where: { tenantId: id } });
+      await tx.brand.deleteMany({ where: { tenantId: id } });
+      await tx.unit.deleteMany({ where: { tenantId: id } });
+      await tx.supplier.deleteMany({ where: { tenantId: id } });
+      await tx.customer.deleteMany({ where: { tenantId: id } });
+
+      // 7. Infraestrutura (Terminais, Lojas, Usuários e RBAC)
+      await tx.terminal.deleteMany({ where: { tenantId: id } });
+      await tx.store.deleteMany({ where: { tenantId: id } });
+      await tx.userRole.deleteMany({ where: { user: { tenantId: id } } });
+      await tx.rolePermission.deleteMany({ where: { role: { tenantId: id } } });
+      await tx.user.deleteMany({ where: { tenantId: id } });
+      await tx.role.deleteMany({ where: { tenantId: id } });
+      await tx.permission.deleteMany({ where: { tenantId: id } });
+
+      // 8. Assinaturas, Logs, Notificações e Jobs
+      await tx.auditLog.deleteMany({ where: { tenantId: id } });
+      await tx.notification.deleteMany({ where: { tenantId: id } });
+      await tx.job.deleteMany({ where: { tenantId: id } });
+      await tx.subscription.deleteMany({ where: { tenantId: id } });
+
+      // 9. Exclui a Empresa (Tenant)
+      return tx.tenant.delete({ where: { id } });
     });
   }
 
