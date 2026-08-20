@@ -155,7 +155,6 @@ export default function LoginPage() {
         }
       });
     } else {
-      // Redirecionar diretamente para o fluxo de OAuth do Google se client_id estiver no redirect
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         window.location.origin + '/login'
       )}&response_type=token&scope=email%20profile`;
@@ -170,13 +169,15 @@ export default function LoginPage() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
-        {/* Header */}
+        {/* Header com a Logo Oficial RetailSyn */}
         <div className="text-center mb-6">
-          <img
-            src="/login-logo.png"
-            alt="Stockfy - PDV • Estoque • Conveniência"
-            className="h-16 md:h-20 mx-auto object-contain filter drop-shadow-2xl"
-          />
+          <div className="w-20 h-20 bg-surface-card border border-surface-border rounded-3xl mx-auto flex items-center justify-center p-2 shadow-2xl shadow-primary-500/10 mb-3">
+            <img src="/logo.jpg" alt="RetailSyn Logo" className="w-full h-full object-contain rounded-2xl" />
+          </div>
+          <h1 className="text-3xl font-black text-white tracking-tight">RetailSyn</h1>
+          <p className="text-xs text-cyan-400 font-bold uppercase tracking-widest mt-1">
+            ESTOQUE &nbsp;|&nbsp; VENDA &nbsp;|&nbsp; GESTÃO
+          </p>
         </div>
 
         {/* Alternar Abas (Entrar vs Criar Conta) */}
@@ -184,7 +185,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => { setMode('login'); setError(''); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition ${
               mode === 'login' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -193,7 +194,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => { setMode('register'); setError(''); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition ${
               mode === 'register' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
             }`}
           >

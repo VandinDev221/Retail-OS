@@ -1,33 +1,23 @@
-'use client';
-
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '../context/auth-context';
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
+import { AuthProvider } from '../context/auth-context';
+import { QueryProvider } from '../providers/query-provider';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 1000 * 15, // 15s cache
-    },
-  },
-});
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'RetailSyn — Estoque | Venda | Gestão',
+  description: 'Sistema de Gestão para Loja de Conveniência, Mercado, Adega e Varejo',
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
-      <head>
-        <title>Stockfy | PDV & Gestão de Estoque</title>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/png" href="/favicon.png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-      </head>
-      <body className="bg-background text-foreground antialiased min-h-screen">
-        <QueryClientProvider client={queryClient}>
+      <body className={inter.className}>
+        <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
-        </QueryClientProvider>
+        </QueryProvider>
       </body>
     </html>
   );

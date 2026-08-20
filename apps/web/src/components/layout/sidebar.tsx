@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -15,7 +15,7 @@ import {
   LogOut,
   Receipt,
   X,
-  Menu,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/auth-context';
 import { cn } from '../../lib/utils';
@@ -31,6 +31,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     { label: 'Produtos & Catálogo', icon: Package, href: '/products' },
     { label: 'Estoque & FEFO', icon: Boxes, href: '/inventory' },
     { label: 'Compras & Entrada', icon: Truck, href: '/purchases' },
+    { label: 'Emissão Fiscal (NFe/NFCe)', icon: FileText, href: '/fiscal' },
     { label: 'Financeiro', icon: Receipt, href: '/finance' },
     { label: 'Relatórios & ABC', icon: FileSpreadsheet, href: '/reports' },
     { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
@@ -40,12 +41,12 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     <div className="flex flex-col justify-between h-full bg-surface border-r border-surface-border">
       <div>
         {/* Brand Header */}
-        <div className="p-5 border-b border-surface-border flex items-center justify-between">
+        <div className="p-4 border-b border-surface-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Retail OS" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-primary-500/20" />
+            <img src="/logo.jpg" alt="RetailSyn" className="w-10 h-10 object-contain rounded-xl" />
             <div>
-              <h1 className="font-bold text-lg text-white tracking-wide">Stockfy</h1>
-              <p className="text-xs text-primary-400 font-medium">PDV & Conveniência</p>
+              <h1 className="font-extrabold text-lg text-white tracking-tight">RetailSyn</h1>
+              <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Estoque | Venda | Gestão</p>
             </div>
           </div>
           {setMobileOpen && (
@@ -56,7 +57,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
         </div>
 
         {/* Navigation Menu */}
-        <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-180px)]">
+        <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-180px)]">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
@@ -67,7 +68,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
                 href={item.href}
                 onClick={() => setMobileOpen && setMobileOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-200',
                   isActive
                     ? 'bg-primary-500/15 text-primary-400 border border-primary-500/30 font-bold'
                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-card',
@@ -83,7 +84,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
       </div>
 
       {/* User Footer */}
-      <div className="p-4 border-t border-surface-border bg-surface-card/40">
+      <div className="p-3.5 border-t border-surface-border bg-surface-card/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-primary-400">
