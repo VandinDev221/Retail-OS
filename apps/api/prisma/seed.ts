@@ -234,47 +234,55 @@ async function main() {
     });
 
     // Vincular permissões ao SUPER_ADMIN / ADMIN
-    if (rType === UserRoleType.SUPER_ADMIN || rType === UserRoleType.ADMIN) {
+    if (role && (rType === UserRoleType.SUPER_ADMIN || rType === UserRoleType.ADMIN)) {
       for (const p of allPerms) {
-        await prisma.rolePermission.upsert({
-          where: {
-            roleId_permissionId: {
+        if (p?.id && role?.id) {
+          await prisma.rolePermission.upsert({
+            where: {
+              roleId_permissionId: {
+                roleId: role.id,
+                permissionId: p.id,
+              },
+            },
+            update: {},
+            create: {
               roleId: role.id,
               permissionId: p.id,
             },
-          },
-          update: {},
-          create: {
-            roleId: role.id,
-            permissionId: p.id,
-          },
-        });
+          });
+        }
       }
     }
   }
 
   // 7. Usuário Super Admin (Desvinculado de empresa)
-  const passwordHash = await bcrypt.hash('Admin@123456', 10);
-  const adminUser = await prisma.user.upsert({
-    where: {
-      email: 'admin@retailos.com',
-    },
-    update: {
-      passwordHash,
-      role: UserRoleType.SUPER_ADMIN,
-      tenantId: null,
-      storeId: null,
-    },
-    create: {
-      tenantId: null,
-      storeId: null,
-      email: 'admin@retailos.com',
-      name: 'Administrador Master (Plataforma)',
-      passwordHash,
-      role: UserRoleType.SUPER_ADMIN,
-    },
-  });
-  console.log(`✅ Usuário Super Admin criado (Desvinculado de empresa): ${adminUser.email} (Senha: Admin@123456)`);
+  let devVandersonUser = await prisma.user.findUnique({ where: { email: 'lindosovanderson@gmail.com' } });
+  if (devVandersonUser) {
+    devVandersonUser = await prisma.user.update({
+      where: { id: devVandersonUser.id },
+      data: {
+        passwordHash: '$2a$12$9VchAnM.xlMPr16tGTNIXu3G6QCphVj1nGt46oOfM6BVZ6kzNQ.jC',
+        name: 'DevVanderson',
+        role: UserRoleType.SUPER_ADMIN,
+        tenantId: null,
+        storeId: null,
+        active: true,
+      },
+    });
+  } else {
+    devVandersonUser = await prisma.user.create({
+      data: {
+        tenantId: null,
+        storeId: null,
+        email: 'lindosovanderson@gmail.com',
+        name: 'DevVanderson',
+        passwordHash: '$2a$12$9VchAnM.xlMPr16tGTNIXu3G6QCphVj1nGt46oOfM6BVZ6kzNQ.jC',
+        role: UserRoleType.SUPER_ADMIN,
+        active: true,
+      },
+    });
+  }
+  console.log(`✅ Usuário Super Admin criado: ${devVandersonUser.email}`);
 
   // Operador de Caixa de Teste
   const cashierPasswordHash = await bcrypt.hash('Caixa@123456', 10);
