@@ -20,6 +20,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (data: { email: string; password: string; tenantSlug?: string }) => Promise<void>;
+  loginWithGoogle: (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
 }
@@ -58,6 +59,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
   };
 
+  const loginWithGoogle = async (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => {
+    const res = await api.post('/auth/google', data);
+    const { accessToken, refreshToken, user: userData } = res.data;
+
+    setToken(accessToken);
+    setUser(userData);
+
+    localStorage.setItem('retail_os_token', accessToken);
+    localStorage.setItem('retail_os_refresh_token', refreshToken);
+    localStorage.setItem('retail_os_user', JSON.stringify(userData));
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -74,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, logout, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );
