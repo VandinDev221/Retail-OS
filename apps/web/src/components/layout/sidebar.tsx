@@ -44,8 +44,8 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Retail OS" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-primary-500/20" />
             <div>
-              <h1 className="font-bold text-lg text-white tracking-wide">Retail OS</h1>
-              <p className="text-xs text-primary-400 font-medium">SaaS Conveniência</p>
+              <h1 className="font-bold text-lg text-white tracking-wide">Stockfy</h1>
+              <p className="text-xs text-primary-400 font-medium">PDV & Conveniência</p>
             </div>
           </div>
           {setMobileOpen && (

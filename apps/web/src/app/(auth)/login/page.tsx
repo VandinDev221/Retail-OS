@@ -171,10 +171,12 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <img src="/logo.png" alt="Retail OS" className="w-16 h-16 rounded-full mx-auto object-cover shadow-xl shadow-primary-500/20 mb-4" />
-          <h1 className="text-2xl font-bold text-white tracking-tight">Retail OS</h1>
-          <p className="text-sm text-zinc-400 mt-1">Sistema de Gestão & Frente de Caixa</p>
+        <div className="text-center mb-6">
+          <img
+            src="/login-logo.png"
+            alt="Stockfy - PDV • Estoque • Conveniência"
+            className="h-16 md:h-20 mx-auto object-contain filter drop-shadow-2xl"
+          />
         </div>
 
         {/* Alternar Abas (Entrar vs Criar Conta) */}
