@@ -33,7 +33,40 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Carregar SDK oficial do Google
+    // 1. Processar retorno de OAuth via hash fragment (#access_token=ya29...)
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+
+      if (accessToken) {
+        setGoogleLoading(true);
+        window.history.replaceState(null, '', window.location.pathname);
+
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+          .then((res) => res.json())
+          .then(async (userInfo) => {
+            if (userInfo.email) {
+              await loginWithGoogle({
+                email: userInfo.email,
+                name: userInfo.name || userInfo.email.split('@')[0],
+              });
+              router.push('/');
+            } else {
+              setError('Não foi possível obter o e-mail da conta Google.');
+            }
+          })
+          .catch((err) => {
+            setError('Falha ao autenticar token do Google.');
+          })
+          .finally(() => {
+            setGoogleLoading(false);
+          });
+      }
+    }
+
+    // 2. Carregar SDK oficial do Google Identity Services
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
@@ -45,7 +78,7 @@ export default function LoginPage() {
         document.body.removeChild(script);
       }
     };
-  }, []);
+  }, [loginWithGoogle, router]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,9 +121,9 @@ export default function LoginPage() {
 
   const handleGoogleLogin = () => {
     setError('');
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1047249272379-fake.apps.googleusercontent.com';
 
-    if (window.google && clientId) {
+    if (window.google && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
       setGoogleLoading(true);
       window.google.accounts.id.initialize({
         client_id: clientId,
@@ -122,7 +155,12 @@ export default function LoginPage() {
         }
       });
     } else {
-      setError('Aguardando configuração da chave GOOGLE_CLIENT_ID no painel da Vercel.');
+      // Redirecionar diretamente para o fluxo de OAuth do Google se client_id estiver no redirect
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+        window.location.origin + '/login'
+      )}&response_type=token&scope=email%20profile`;
+      
+      window.location.href = authUrl;
     }
   };
 
