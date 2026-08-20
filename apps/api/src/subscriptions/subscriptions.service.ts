@@ -36,46 +36,46 @@ export class SubscriptionsService {
     return new StripeClass(stripeSecretKey);
   }
 
-  // Listar Planos Ativos (Garantindo estritamente os 3 planos oficiais sem duplicidade)
+  // Listar Planos Ativos (Garantindo estritamente os 3 planos oficiais com preços e IDs oficiais)
   async getPlans() {
     const OFFICIAL_PLANS: Record<string, any> = {
       starter: {
         id: 'prod_V6bw5XekJTmQMD',
         name: 'RetailSyn Plano Starter',
         slug: 'starter',
-        description: 'Ideal para 1 loja de conveniência ou minimercado.',
+        description: 'Ideal para 1 loja de conveniência ou minimercado individual.',
         priceMonthly: 159.99,
         priceYearly: 1499.99,
         stripePriceIdMonthly: null,
         stripePriceIdYearly: null,
         maxStores: 1,
-        maxUsers: 5,
-        maxProducts: 5000,
+        maxUsers: 3,
+        maxProducts: 1000,
       },
       pro: {
         id: 'prod_V6cdBztmqGbm0M',
         name: 'RetailSyn Plano Pro',
         slug: 'pro',
-        description: 'Para redes de até 3 lojas com módulo fiscal.',
+        description: 'Para redes de até 3 lojas',
         priceMonthly: 249.99,
         priceYearly: 1999.99,
         stripePriceIdMonthly: null,
         stripePriceIdYearly: null,
         maxStores: 3,
-        maxUsers: 30,
-        maxProducts: 10000,
+        maxUsers: 10,
+        maxProducts: 1000,
       },
       enterprise: {
-        id: 'prod_enterprise',
+        id: 'prod_V6qvsckVceq3q9',
         name: 'RetailSyn Interprise',
         slug: 'enterprise',
         description: 'Ideal para grandes redes, lojas e usuários ilimitados.',
         priceMonthly: 499.99,
-        priceYearly: 3999.99,
+        priceYearly: 3799.99,
         stripePriceIdMonthly: null,
         stripePriceIdYearly: null,
-        maxStores: 10,
-        maxUsers: 100,
+        maxStores: 999,
+        maxUsers: 999,
         maxProducts: 999999,
       },
     };
@@ -98,13 +98,13 @@ export class SubscriptionsService {
             const nameLower = prod.name?.toLowerCase() || '';
             const metaSlug = prod.metadata?.slug?.toLowerCase();
 
-            if (metaSlug === 'starter' || nameLower.includes('starter') || prod.id === 'prod_V6bw5XekJTmQMD') {
+            if (prod.id === 'prod_V6bw5XekJTmQMD' || metaSlug === 'starter' || nameLower.includes('starter')) {
               productIdToSlugMap.set(prod.id, 'starter');
               OFFICIAL_PLANS.starter.id = prod.id;
-            } else if (metaSlug === 'enterprise' || metaSlug === 'interprise' || nameLower.includes('enterprise') || nameLower.includes('interprise')) {
+            } else if (prod.id === 'prod_V6qvsckVceq3q9' || metaSlug === 'enterprise' || metaSlug === 'interprise' || nameLower.includes('enterprise') || nameLower.includes('interprise')) {
               productIdToSlugMap.set(prod.id, 'enterprise');
               OFFICIAL_PLANS.enterprise.id = prod.id;
-            } else if (metaSlug === 'pro' || nameLower.includes('pro') || prod.id === 'prod_V6cdBztmqGbm0M') {
+            } else if (prod.id === 'prod_V6cdBztmqGbm0M' || metaSlug === 'pro' || nameLower.includes('pro')) {
               productIdToSlugMap.set(prod.id, 'pro');
               OFFICIAL_PLANS.pro.id = prod.id;
             }
@@ -120,10 +120,14 @@ export class SubscriptionsService {
               const amount = p.unit_amount ? p.unit_amount / 100 : 0;
 
               if (p.recurring?.interval === 'year') {
-                if (amount > 0) plan.priceYearly = amount;
+                if (amount > 0 && Math.abs(amount - (slug === 'starter' ? 1499.99 : slug === 'pro' ? 1999.99 : 3799.99)) < 10) {
+                  plan.priceYearly = amount;
+                }
                 if (!plan.stripePriceIdYearly) plan.stripePriceIdYearly = p.id;
               } else {
-                if (amount > 0) plan.priceMonthly = amount;
+                if (amount > 0 && Math.abs(amount - (slug === 'starter' ? 159.99 : slug === 'pro' ? 249.99 : 499.99)) < 10) {
+                  plan.priceMonthly = amount;
+                }
                 if (!plan.stripePriceIdMonthly) plan.stripePriceIdMonthly = p.id;
               }
             }
@@ -133,6 +137,14 @@ export class SubscriptionsService {
         console.error('Erro ao buscar produtos e preços diretamente da Stripe API:', stripeErr);
       }
     }
+
+    // Garantir preços oficiais estritos
+    OFFICIAL_PLANS.starter.priceMonthly = 159.99;
+    OFFICIAL_PLANS.starter.priceYearly = 1499.99;
+    OFFICIAL_PLANS.pro.priceMonthly = 249.99;
+    OFFICIAL_PLANS.pro.priceYearly = 1999.99;
+    OFFICIAL_PLANS.enterprise.priceMonthly = 499.99;
+    OFFICIAL_PLANS.enterprise.priceYearly = 3799.99;
 
     return [OFFICIAL_PLANS.starter, OFFICIAL_PLANS.pro, OFFICIAL_PLANS.enterprise];
   }
