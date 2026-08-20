@@ -198,6 +198,24 @@ export default function SettingsPage() {
         )}
       </div>
 
+      {portalError && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start justify-between gap-3 shadow-lg">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-400 mt-0.5" />
+            <div className="space-y-1">
+              <strong className="font-bold text-amber-200 block">Aviso do Portal Stripe</strong>
+              <p className="leading-relaxed">{portalError}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setPortalError(null)}
+            className="p-1 rounded-lg text-amber-400 hover:text-white hover:bg-amber-500/20 transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* ABA USUARIOS */}
       {tab === 'users' && (
         <div className="bg-surface border border-surface-border rounded-2xl overflow-hidden shadow-xl">
