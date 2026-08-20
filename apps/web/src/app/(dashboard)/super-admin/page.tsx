@@ -571,15 +571,15 @@ export default function SuperAdminPlatformPage() {
                 <ul className="text-xs text-zinc-300 space-y-2">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
-                    <span>Até {plan.maxStores} Lojas</span>
+                    <span>{plan.maxStores >= 999 ? 'Lojas Ilimitadas' : `Até ${plan.maxStores} Lojas`}</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
-                    <span>Até {plan.maxUsers} Usuários</span>
+                    <span>{plan.maxUsers >= 999 ? 'Usuários Ilimitados' : `Até ${plan.maxUsers} Usuários`}</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
-                    <span>Até {plan.maxProducts} Produtos Cadastrados</span>
+                    <span>{plan.maxProducts >= 999999 ? 'Produtos Ilimitados' : `Até ${plan.maxProducts} Produtos`}</span>
                   </li>
                 </ul>
               </div>

@@ -519,8 +519,8 @@ export default function LoginPage() {
                       <p className="text-[11px] text-zinc-400 mb-2">Ideal para 1 loja de conveniência ou minimercado.</p>
                       <ul className="text-[11px] text-zinc-300 space-y-1 mb-3">
                         <li>• Até 1 Loja</li>
-                        <li>• Até 3 Usuários</li>
-                        <li>• Até 1000 Produtos</li>
+                        <li>• Até 5 Usuários</li>
+                        <li>• Até 5000 Produtos</li>
                       </ul>
                     </div>
                     <div className="text-emerald-400 font-mono font-black text-sm pt-2 border-t border-surface-border">
@@ -552,8 +552,8 @@ export default function LoginPage() {
                       <p className="text-[11px] text-zinc-400 mb-2">Para redes de até 3 lojas com módulo fiscal.</p>
                       <ul className="text-[11px] text-zinc-300 space-y-1 mb-3">
                         <li>• Até 3 Lojas</li>
-                        <li>• Até 10 Usuários</li>
-                        <li>• Até 1000 Produtos</li>
+                        <li>• Até 30 Usuários</li>
+                        <li>• Até 10000 Produtos</li>
                       </ul>
                     </div>
                     <div className="text-emerald-400 font-mono font-black text-sm pt-2 border-t border-surface-border">
@@ -581,13 +581,13 @@ export default function LoginPage() {
                       </div>
                       <p className="text-[11px] text-zinc-400 mb-2">Ideal para grandes redes, lojas e usuários ilimitados.</p>
                       <ul className="text-[11px] text-zinc-300 space-y-1 mb-3">
-                        <li>• Lojas Ilimitadas</li>
-                        <li>• Usuários Ilimitados</li>
+                        <li>• Até 10 Lojas</li>
+                        <li>• Até 100 Usuários</li>
                         <li>• Produtos Ilimitados</li>
                       </ul>
                     </div>
                     <div className="text-emerald-400 font-mono font-black text-sm pt-2 border-t border-surface-border">
-                      {billingCycle === 'YEARLY' ? 'R$ 3.799,99 /ano' : 'R$ 499,99 /mês'}
+                      {billingCycle === 'YEARLY' ? 'R$ 3.999,99 /ano' : 'R$ 499,99 /mês'}
                     </div>
                   </div>
                 </div>
