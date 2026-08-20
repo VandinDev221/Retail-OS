@@ -3,8 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CashSessionStatus, CashMovementType, PaymentMethod, Prisma } from '@prisma/client';
 
 export interface OpenSessionDto {
-  storeId: string;
-  cashRegisterId: string;
+  storeId?: string;
+  cashRegisterId?: string;
   initialBalance: number;
   notes?: string;
 }
@@ -25,9 +25,20 @@ export interface CloseSessionDto {
 export class CashService {
   constructor(private prisma: PrismaService) {}
 
-  async getRegisters(tenantId: string, storeId: string) {
-    return this.prisma.cashRegister.findMany({
-      where: { tenantId, storeId, active: true },
+  async getRegisters(tenantId: string, storeId?: string) {
+    let targetStoreId = storeId;
+    if (!targetStoreId) {
+      let store = await this.prisma.store.findFirst({ where: { tenantId } });
+      if (!store) {
+        store = await this.prisma.store.create({
+          data: { tenantId, name: 'Loja Principal' },
+        });
+      }
+      targetStoreId = store.id;
+    }
+
+    let registers = await this.prisma.cashRegister.findMany({
+      where: { tenantId, storeId: targetStoreId, active: true },
       include: {
         terminal: true,
         sessions: {
@@ -36,13 +47,35 @@ export class CashService {
         },
       },
     });
+
+    if (registers.length === 0) {
+      const defaultRegister = await this.prisma.cashRegister.create({
+        data: { tenantId, storeId: targetStoreId, name: 'Caixa Principal 01', active: true },
+        include: {
+          terminal: true,
+          sessions: {
+            where: { status: CashSessionStatus.OPEN },
+            include: { openedBy: { select: { id: true, name: true } } },
+          },
+        },
+      });
+      registers = [defaultRegister];
+    }
+
+    return registers;
   }
 
-  async getActiveSession(tenantId: string, storeId: string, userId?: string) {
+  async getActiveSession(tenantId: string, storeId?: string, userId?: string) {
+    let targetStoreId = storeId;
+    if (!targetStoreId) {
+      const store = await this.prisma.store.findFirst({ where: { tenantId } });
+      targetStoreId = store?.id;
+    }
+
     return this.prisma.cashSession.findFirst({
       where: {
         tenantId,
-        storeId,
+        ...(targetStoreId ? { storeId: targetStoreId } : {}),
         status: CashSessionStatus.OPEN,
         ...(userId ? { openedById: userId } : {}),
       },
@@ -55,10 +88,29 @@ export class CashService {
   }
 
   async openSession(tenantId: string, userId: string, dto: OpenSessionDto) {
+    let cashRegisterId = dto.cashRegisterId;
+    let storeId = dto.storeId;
+
+    if (!cashRegisterId) {
+      const registers = await this.getRegisters(tenantId, storeId);
+      cashRegisterId = registers[0].id;
+      storeId = registers[0].storeId;
+    } else if (!storeId) {
+      const register = await this.prisma.cashRegister.findUnique({
+        where: { id: cashRegisterId },
+      });
+      if (register) {
+        storeId = register.storeId;
+      } else {
+        const store = await this.prisma.store.findFirst({ where: { tenantId } });
+        storeId = store?.id || '';
+      }
+    }
+
     // Verificar se o caixa já está aberto
     const openSession = await this.prisma.cashSession.findFirst({
       where: {
-        cashRegisterId: dto.cashRegisterId,
+        cashRegisterId,
         status: CashSessionStatus.OPEN,
       },
     });
@@ -71,11 +123,11 @@ export class CashService {
       const session = await tx.cashSession.create({
         data: {
           tenantId,
-          storeId: dto.storeId,
-          cashRegisterId: dto.cashRegisterId,
+          storeId,
+          cashRegisterId,
           openedById: userId,
           status: CashSessionStatus.OPEN,
-          initialBalance: dto.initialBalance,
+          initialBalance: dto.initialBalance || 0,
           notes: dto.notes,
           openedAt: new Date(),
         },
