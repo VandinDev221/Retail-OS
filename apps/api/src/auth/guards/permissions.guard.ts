@@ -22,12 +22,16 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Acesso não autorizado');
     }
 
-    // Super Admin tem passe livre
-    if (user.role === UserRoleType.SUPER_ADMIN) {
+    // Super Admin e Admin têm passe livre total
+    if (user.role === UserRoleType.SUPER_ADMIN || user.role === UserRoleType.ADMIN) {
       return true;
     }
 
     const userPermissions: string[] = user.permissions || [];
+    if (userPermissions.includes('*')) {
+      return true;
+    }
+
     const hasAll = requiredPermissions.every((perm) => userPermissions.includes(perm));
 
     if (!hasAll) {

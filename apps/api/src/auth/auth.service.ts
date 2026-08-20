@@ -283,7 +283,8 @@ export class AuthService {
       const allPerms = await this.prisma.permission.findMany({
         where: { tenantId },
       });
-      return allPerms.map((p) => p.name);
+      const keys = allPerms.map((p) => p.key);
+      return keys.length > 0 ? keys : ['*'];
     }
 
     const userRoles = await this.prisma.userRole.findMany({
@@ -304,9 +305,31 @@ export class AuthService {
     const permissionsSet = new Set<string>();
     userRoles.forEach((ur) => {
       ur.role.rolePermissions.forEach((rp) => {
-        permissionsSet.add(rp.permission.name);
+        if (rp.permission?.key) {
+          permissionsSet.add(rp.permission.key);
+        }
       });
     });
+
+    if (role === UserRoleType.GERENTE) {
+      permissionsSet.add('reports:sales');
+      permissionsSet.add('reports:stock');
+      permissionsSet.add('stock:read');
+      permissionsSet.add('stock:lots');
+      permissionsSet.add('stock:adjust');
+      permissionsSet.add('stock:inventory');
+      permissionsSet.add('cash:open');
+      permissionsSet.add('cash:close');
+      permissionsSet.add('cash:supply');
+      permissionsSet.add('cash:sangria');
+      permissionsSet.add('cash:view_blind_closure');
+    } else if (role === UserRoleType.CAIXA) {
+      permissionsSet.add('cash:open');
+      permissionsSet.add('cash:close');
+      permissionsSet.add('cash:supply');
+      permissionsSet.add('cash:sangria');
+      permissionsSet.add('stock:read');
+    }
 
     return Array.from(permissionsSet);
   }
