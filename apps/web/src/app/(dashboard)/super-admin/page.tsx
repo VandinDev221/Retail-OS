@@ -685,9 +685,8 @@ export default function SuperAdminPlatformPage() {
                   onChange={(e) => setTenantForm({ ...tenantForm, plan: e.target.value })}
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-zinc-100 focus:border-primary-400 outline-none font-bold"
                 >
-                  <option value="STARTER">STARTER (R$ 99/mês)</option>
-                  <option value="PRO">PRO (R$ 199/mês)</option>
-                  <option value="ENTERPRISE">ENTERPRISE (R$ 499/mês)</option>
+                  <option value="STARTER">STARTER (R$ 159,99/mês - R$ 1.499,99/ano)</option>
+                  <option value="PRO">PRO (R$ 249,99/mês - R$ 1.999,99/ano)</option>
                 </select>
               </div>
 
