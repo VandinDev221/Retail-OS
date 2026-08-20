@@ -253,39 +253,34 @@ async function main() {
     }
   }
 
-  // 7. Usuário Super Admin
+  // 7. Usuário Super Admin (Desvinculado de empresa)
   const passwordHash = await bcrypt.hash('Admin@123456', 10);
   const adminUser = await prisma.user.upsert({
     where: {
-      tenantId_email: {
-        tenantId: tenant.id,
-        email: 'admin@retailos.com',
-      },
+      email: 'admin@retailos.com',
     },
     update: {
       passwordHash,
       role: UserRoleType.SUPER_ADMIN,
-      storeId: store.id,
+      tenantId: null,
+      storeId: null,
     },
     create: {
-      tenantId: tenant.id,
-      storeId: store.id,
+      tenantId: null,
+      storeId: null,
       email: 'admin@retailos.com',
-      name: 'Administrador Master',
+      name: 'Administrador Master (Plataforma)',
       passwordHash,
       role: UserRoleType.SUPER_ADMIN,
     },
   });
-  console.log(`✅ Usuário Admin criado: ${adminUser.email} (Senha: Admin@123456)`);
+  console.log(`✅ Usuário Super Admin criado (Desvinculado de empresa): ${adminUser.email} (Senha: Admin@123456)`);
 
   // Operador de Caixa de Teste
   const cashierPasswordHash = await bcrypt.hash('Caixa@123456', 10);
   await prisma.user.upsert({
     where: {
-      tenantId_email: {
-        tenantId: tenant.id,
-        email: 'caixa@retailos.com',
-      },
+      email: 'caixa@retailos.com',
     },
     update: {},
     create: {

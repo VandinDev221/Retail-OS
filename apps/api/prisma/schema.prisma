@@ -257,9 +257,9 @@ model Terminal {
 // ----------------------------------------------------
 model User {
   id           String       @id @default(uuid())
-  tenantId     String       @map("tenant_id")
+  tenantId     String?      @map("tenant_id")
   storeId      String?      @map("store_id")
-  email        String
+  email        String       @unique
   passwordHash String       @map("password_hash")
   name         String
   role         UserRoleType @default(CAIXA)
@@ -267,7 +267,7 @@ model User {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles          UserRole[]
   sales              Sale[]
   cashSessionsOpened CashSession[]       @relation("OpenedSessions")
@@ -282,7 +282,6 @@ model User {
   goodsReceipts      GoodsReceipt[]
   saleReturns        SaleReturn[]
 
-  @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
 }

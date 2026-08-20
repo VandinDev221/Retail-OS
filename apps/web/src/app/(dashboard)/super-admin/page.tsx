@@ -489,7 +489,9 @@ export default function SuperAdminPlatformPage() {
                     <tr key={u.id} className="hover:bg-surface-card/50 transition">
                       <td className="p-4 font-bold text-white">{u.name}</td>
                       <td className="p-4 font-mono text-zinc-300">{u.email}</td>
-                      <td className="p-4 font-bold text-primary-400">{u.tenant?.name || 'N/A'}</td>
+                      <td className="p-4 font-bold text-primary-400">
+                        {u.role === 'SUPER_ADMIN' ? 'Nenhuma (Plataforma Global)' : u.tenant?.name || 'N/A'}
+                      </td>
                       <td className="p-4">
                         <span className="px-2 py-0.5 rounded-full bg-primary-500/15 text-primary-400 font-bold text-[10px] uppercase border border-primary-500/30">
                           {u.role}
@@ -733,11 +735,11 @@ export default function SuperAdminPlatformPage() {
               <div>
                 <label className="block text-zinc-400 mb-1 font-semibold">Empresa Pertencente (Tenant)</label>
                 <select
-                  required
                   value={userForm.tenantId}
                   onChange={(e) => setUserForm({ ...userForm, tenantId: e.target.value })}
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-zinc-100 focus:border-primary-400 outline-none font-bold"
                 >
+                  <option value="">Nenhuma (Super Admin Global / Plataforma)</option>
                   {tenants?.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name} ({t.slug})

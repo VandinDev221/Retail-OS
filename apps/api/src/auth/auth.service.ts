@@ -64,7 +64,7 @@ export class AuthService {
       throw new UnauthorizedException('E-mail ou senha incorretos.');
     }
 
-    if (!user.tenant.active) {
+    if (user.role !== UserRoleType.SUPER_ADMIN && user.tenant && !user.tenant.active) {
       throw new UnauthorizedException('Sua conta possui pendência de pagamento ou está inativa. Conclua o pagamento do plano para liberar o acesso ao sistema.');
     }
 
@@ -233,7 +233,7 @@ export class AuthService {
         include: { tenant: true },
       });
 
-      if (!user || !user.active || !user.tenant.active) {
+      if (!user || !user.active || (user.role !== UserRoleType.SUPER_ADMIN && user.tenant && !user.tenant.active)) {
         throw new UnauthorizedException('Sessão expirada');
       }
 
@@ -244,8 +244,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
-        tenantId: user.tenantId,
-        storeId: user.storeId,
+        tenantId: user.tenantId || null,
+        storeId: user.storeId || null,
         permissions,
       };
 
@@ -270,8 +270,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
-      tenantId: user.tenantId,
-      storeId: user.storeId,
+      tenantId: user.tenantId || null,
+      storeId: user.storeId || null,
       permissions,
     };
 
@@ -281,7 +281,7 @@ export class AuthService {
     });
 
     const refreshToken = this.jwtService.sign(
-      { sub: user.id, tenantId: user.tenantId },
+      { sub: user.id, tenantId: user.tenantId || null },
       {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET') || 'default-refresh-secret-for-dev',
         expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
@@ -296,17 +296,22 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
-        tenantId: user.tenantId,
-        tenantName: user.tenant.name,
-        tenantSlug: user.tenant.slug,
-        storeId: user.storeId,
+        tenantId: user.tenantId || null,
+        tenantName: user.tenant?.name || 'Plataforma RetailSyn',
+        tenantSlug: user.tenant?.slug || 'superadmin',
+        storeId: user.storeId || null,
         permissions,
       },
     };
   }
 
-  async getUserPermissions(userId: string, tenantId: string, role: UserRoleType): Promise<string[]> {
-    if (role === UserRoleType.SUPER_ADMIN || role === UserRoleType.ADMIN) {
+  async getUserPermissions(userId: string, tenantId: string | null, role: UserRoleType): Promise<string[]> {
+    if (role === UserRoleType.SUPER_ADMIN) {
+      return ['superadmin:manage', 'tenants:manage', 'users:manage'];
+    }
+
+    if (role === UserRoleType.ADMIN) {
+      if (!tenantId) return ['*'];
       const allPerms = await this.prisma.permission.findMany({
         where: { tenantId },
       });
