@@ -24,6 +24,7 @@ import { FinanceModule } from './finance/finance.module';
 import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { JobsModule } from './jobs/jobs.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { JobsModule } from './jobs/jobs.module';
     ReportsModule,
     NotificationsModule,
     JobsModule,
+    SubscriptionsModule,
   ],
   providers: [
     {

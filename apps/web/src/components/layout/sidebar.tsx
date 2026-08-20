@@ -16,6 +16,9 @@ import {
   Receipt,
   X,
   FileText,
+  ShieldCheck,
+  Building,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../../context/auth-context';
 import { cn } from '../../lib/utils';
@@ -24,7 +27,17 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-  const menuItems = [
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+  // Menu do Super Admin (Monitoramento de Plataforma, Logs, Empresas e Planos)
+  const superAdminMenuItems = [
+    { label: 'Visão Geral Plataforma', icon: LayoutDashboard, href: '/' },
+    { label: 'Empresas & Assinaturas', icon: Building, href: '/super-admin', highlight: true },
+    { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
+  ];
+
+  // Menu Operacional de Loja (Admins de Loja, Gerentes, Caixas)
+  const storeMenuItems = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
     { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
     { label: 'Controle de Caixa', icon: Wallet, href: '/cash' },
@@ -37,6 +50,8 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
   ];
 
+  const menuItems = isSuperAdmin ? superAdminMenuItems : storeMenuItems;
+
   const content = (
     <div className="flex flex-col justify-between h-full bg-surface border-r border-surface-border">
       <div>
@@ -46,7 +61,9 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
             <img src="/logo.jpg" alt="RetailSyn" className="w-10 h-10 object-contain rounded-xl" />
             <div>
               <h1 className="font-extrabold text-lg text-white tracking-tight">RetailSyn</h1>
-              <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Estoque | Venda | Gestão</p>
+              <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
+                {isSuperAdmin ? 'Super Admin SaaS' : 'Estoque | Venda | Gestão'}
+              </p>
             </div>
           </div>
           {setMobileOpen && (
@@ -88,11 +105,11 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-primary-400">
-              {user?.name?.slice(0, 2).toUpperCase() || 'US'}
+              {user?.name?.slice(0, 2).toUpperCase() || 'SA'}
             </div>
             <div className="truncate">
-              <p className="text-xs font-medium text-zinc-200 truncate">{user?.name || 'Operador'}</p>
-              <p className="text-[10px] text-zinc-400 truncate">{user?.role || 'CAIXA'}</p>
+              <p className="text-xs font-medium text-zinc-200 truncate">{user?.name || 'Super Admin'}</p>
+              <p className="text-[10px] text-primary-400 font-bold truncate">{user?.role || 'SUPER_ADMIN'}</p>
             </div>
           </div>
           <button
