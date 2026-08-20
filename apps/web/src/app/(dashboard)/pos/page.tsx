@@ -642,7 +642,7 @@ export default function PosPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Status Fiscal:</span>
-                <span className="text-primary-400">Simulado / NFC-e Homologada</span>
+                <span className="text-primary-400">NFC-e Emitida / SEFAZ</span>
               </div>
             </div>
 

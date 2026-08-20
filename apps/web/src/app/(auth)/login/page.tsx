@@ -9,9 +9,9 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState('admin@retailos.com');
-  const [password, setPassword] = useState('Admin@123456');
-  const [tenantSlug, setTenantSlug] = useState('loja-matriz');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [tenantSlug, setTenantSlug] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,10 +21,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login({ email, password, tenantSlug });
+      await login({ 
+        email: email.trim(), 
+        password, 
+        tenantSlug: tenantSlug.trim() || undefined 
+      });
       router.push('/');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Falha ao autenticar. Verifique seus dados.');
+      setError(err?.response?.data?.message || 'E-mail ou senha incorretos.');
     } finally {
       setLoading(false);
     }
@@ -42,13 +46,13 @@ export default function LoginPage() {
             R
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Retail OS</h1>
-          <p className="text-sm text-zinc-400 mt-1">Gestão de Conveniência & PDV Transacional</p>
+          <p className="text-sm text-zinc-400 mt-1">Sistema de Gestão & Frente de Caixa</p>
         </div>
 
-        {/* Card */}
+        {/* Card de Login */}
         <div className="bg-surface border border-surface-border rounded-2xl p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
           {error && (
-            <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+            <div className="mb-6 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -57,7 +61,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Empresa (Slug)
+                Empresa (Código / Slug)
               </label>
               <div className="relative">
                 <Store className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
@@ -65,7 +69,7 @@ export default function LoginPage() {
                   type="text"
                   value={tenantSlug}
                   onChange={(e) => setTenantSlug(e.target.value)}
-                  placeholder="loja-matriz"
+                  placeholder="Identificador da loja"
                   className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
                 />
               </div>
@@ -82,7 +86,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@retailos.com"
+                  placeholder="seu.email@empresa.com"
                   className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
                 />
               </div>
@@ -114,41 +118,12 @@ export default function LoginPage() {
                 <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Acessar Sistema</span>
+                  <span>Entrar</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-surface-border/60">
-            <p className="text-[11px] text-zinc-400 text-center font-medium mb-2">Credenciais padrão de demonstração:</p>
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-300">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@retailos.com');
-                  setPassword('Admin@123456');
-                }}
-                className="p-2 rounded-lg bg-surface-card hover:bg-surface-border text-left border border-surface-border/80 transition"
-              >
-                <p className="font-semibold text-primary-400">Admin Geral</p>
-                <p className="text-zinc-400 text-[10px]">Admin@123456</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('caixa@retailos.com');
-                  setPassword('Caixa@123456');
-                }}
-                className="p-2 rounded-lg bg-surface-card hover:bg-surface-border text-left border border-surface-border/80 transition"
-              >
-                <p className="font-semibold text-primary-400">Operador Caixa</p>
-                <p className="text-zinc-400 text-[10px]">Caixa@123456</p>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

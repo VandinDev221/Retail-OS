@@ -19,7 +19,7 @@ export function Navbar() {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Online / Neon DB</span>
+          <span>Online / Produção</span>
         </div>
 
         <button className="p-2 rounded-lg bg-surface-card border border-surface-border text-zinc-400 hover:text-zinc-100 transition relative">
