@@ -49,7 +49,7 @@ export class SubscriptionsService {
             productsMap.set(prod.id, {
               id: prod.id,
               name: prod.name,
-              slug: prod.metadata?.slug || prod.name.toLowerCase().replace(/[^a-z0-9]/gi, '-'),
+              slug: prod.metadata?.slug || prod.id,
               description: prod.description || '',
               priceMonthly: 0,
               priceYearly: 0,
@@ -156,73 +156,100 @@ export class SubscriptionsService {
     return sub;
   }
 
-  // --- INTEGRAÇÃO STRIPE CHECKOUT ---
+  // --- INTEGRAÇÃO STRIPE CHECKOUT & PORTAL ---
 
   async createStripeCheckoutSession(tenantId: string, dto: CheckoutSubscriptionDto) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Empresa não encontrada');
 
-    let plan = await this.prisma.plan.findUnique({ where: { slug: dto.planSlug } });
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
-      const stripe = new Stripe(stripeSecretKey);
+      try {
+        const stripe = new Stripe(stripeSecretKey);
 
-      let customerId = tenant.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: tenant.email || undefined,
-          name: tenant.name,
-          metadata: { tenantId: tenant.id, tenantSlug: tenant.slug },
-        });
-        customerId = customer.id;
-        await this.prisma.tenant.update({
-          where: { id: tenant.id },
-          data: { stripeCustomerId: customerId },
-        });
-      }
+        // 1. Obter ou criar Cliente na Stripe
+        let customerId = tenant.stripeCustomerId;
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: tenant.email || undefined,
+            name: tenant.name,
+            metadata: { tenantId: tenant.id, tenantSlug: tenant.slug },
+          });
+          customerId = customer.id;
+          await this.prisma.tenant.update({
+            where: { id: tenant.id },
+            data: { stripeCustomerId: customerId },
+          });
+        }
 
-      const priceId = plan
-        ? dto.billingCycle === 'YEARLY'
-          ? plan.stripePriceIdYearly
-          : plan.stripePriceIdMonthly
-        : null;
+        // 2. Buscar o ID do Preço na Stripe
+        let stripePriceId: string | null = null;
 
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        mode: 'subscription',
-        line_items: [
-          priceId
-            ? { price: priceId, quantity: 1 }
-            : {
-                price_data: {
-                  currency: 'brl',
-                  product_data: {
-                    name: `Assinatura RetailSyn - ${plan?.name || dto.planSlug}`,
-                    description: plan?.description || undefined,
-                  },
-                  unit_amount: Math.round(
-                    Number(dto.billingCycle === 'YEARLY' ? plan?.priceYearly || 1990 : plan?.priceMonthly || 199) * 100
-                  ),
-                  recurring: {
-                    interval: dto.billingCycle === 'YEARLY' ? 'year' : 'month',
-                  },
+        // Se planSlug for um ID de Produto ou Preço direto da Stripe (ex: prod_... ou price_...)
+        if (dto.planSlug.startsWith('price_')) {
+          stripePriceId = dto.planSlug;
+        } else {
+          // Buscar preços ativos na Stripe para associar
+          const pricesRes = await stripe.prices.list({ active: true, expand: ['data.product'] });
+          const targetInterval = dto.billingCycle === 'YEARLY' ? 'year' : 'month';
+
+          const matchedPrice = pricesRes.data.find((p: any) => {
+            const prod = p.product;
+            const matchesSlug =
+              prod?.id === dto.planSlug ||
+              prod?.metadata?.slug === dto.planSlug ||
+              prod?.name?.toLowerCase().includes(dto.planSlug.toLowerCase());
+            return matchesSlug && p.recurring?.interval === targetInterval;
+          });
+
+          if (matchedPrice) {
+            stripePriceId = matchedPrice.id;
+          } else if (pricesRes.data.length > 0) {
+            // Pegar primeiro preço com intervalo correspondente
+            const fallbackPrice = pricesRes.data.find((p) => p.recurring?.interval === targetInterval) || pricesRes.data[0];
+            stripePriceId = fallbackPrice.id;
+          }
+        }
+
+        // 3. Montar a linha de cobrança
+        const lineItem = stripePriceId
+          ? { price: stripePriceId, quantity: 1 }
+          : {
+              price_data: {
+                currency: 'brl',
+                product_data: {
+                  name: `Assinatura RetailSyn (${dto.planSlug.toUpperCase()})`,
                 },
-                quantity: 1,
+                unit_amount: dto.billingCycle === 'YEARLY' ? 199000 : 19900,
+                recurring: {
+                  interval: (dto.billingCycle === 'YEARLY' ? 'year' : 'month') as Stripe.Checkout.SessionCreateParams.LineItem.PriceData.Recurring.Interval,
+                },
               },
-        ],
-        success_url: `${appUrl}/settings?session_id={CHECKOUT_SESSION_ID}&status=success`,
-        cancel_url: `${appUrl}/settings?status=canceled`,
-        metadata: {
-          tenantId: tenant.id,
-          planSlug: dto.planSlug,
-          billingCycle: dto.billingCycle,
-        },
-      });
+              quantity: 1,
+            };
 
-      return { checkoutUrl: session.url };
+        // 4. Criar a sessão de checkout hospedada no servidor da Stripe
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          mode: 'subscription',
+          line_items: [lineItem],
+          success_url: `${appUrl}/settings?session_id={CHECKOUT_SESSION_ID}&status=success`,
+          cancel_url: `${appUrl}/settings?status=canceled`,
+          metadata: {
+            tenantId: tenant.id,
+            planSlug: dto.planSlug,
+            billingCycle: dto.billingCycle,
+          },
+        });
+
+        return { checkoutUrl: session.url };
+      } catch (stripeErr: any) {
+        console.error('Erro na criação da sessão do Stripe Checkout:', stripeErr);
+        throw new BadRequestException(stripeErr?.message || 'Falha ao conectar com o serviço de Checkout da Stripe.');
+      }
     }
 
     await this.checkout(tenantId, dto);
@@ -231,22 +258,42 @@ export class SubscriptionsService {
 
   async createStripeCustomerPortal(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant || !tenant.stripeCustomerId) {
-      throw new BadRequestException('Empresa não possui registro financeiro na Stripe.');
-    }
+    if (!tenant) throw new NotFoundException('Empresa não encontrada');
 
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
-      const stripe = new Stripe(stripeSecretKey);
+      try {
+        const stripe = new Stripe(stripeSecretKey);
 
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: tenant.stripeCustomerId,
-        return_url: `${appUrl}/settings`,
-      });
+        let customerId = tenant.stripeCustomerId;
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: tenant.email || undefined,
+            name: tenant.name,
+            metadata: { tenantId: tenant.id, tenantSlug: tenant.slug },
+          });
+          customerId = customer.id;
+          await this.prisma.tenant.update({
+            where: { id: tenant.id },
+            data: { stripeCustomerId: customerId },
+          });
+        }
 
-      return { portalUrl: portalSession.url };
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: `${appUrl}/settings`,
+        });
+
+        return { portalUrl: portalSession.url };
+      } catch (stripeErr: any) {
+        console.error('Erro ao abrir o Portal da Stripe:', stripeErr);
+        // Se o portal não tiver sido ativado nas configurações do Stripe Dashboard
+        throw new BadRequestException(
+          'Para acessar o Portal do Cliente, ative o Customer Portal nas configurações do seu Stripe Dashboard (Settings -> Customer Portal).'
+        );
+      }
     }
 
     return { portalUrl: `${appUrl}/settings` };
