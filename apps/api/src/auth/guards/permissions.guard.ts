@@ -1,6 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRoleType } from '@prisma/client';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 
 @Injectable()
@@ -19,25 +18,10 @@ export class PermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
     if (!user) {
-      throw new ForbiddenException('Acesso não autorizado');
+      throw new ForbiddenException('Acesso não autorizado. Por favor, faça login novamente.');
     }
 
-    // Super Admin e Admin têm passe livre total
-    if (user.role === UserRoleType.SUPER_ADMIN || user.role === UserRoleType.ADMIN) {
-      return true;
-    }
-
-    const userPermissions: string[] = user.permissions || [];
-    if (userPermissions.includes('*')) {
-      return true;
-    }
-
-    const hasAll = requiredPermissions.every((perm) => userPermissions.includes(perm));
-
-    if (!hasAll) {
-      throw new ForbiddenException('Você não possui permissão para executar esta ação');
-    }
-
+    // Todos os usuários autenticados da empresa possuem permissão total de uso dos módulos
     return true;
   }
 }
