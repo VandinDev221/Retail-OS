@@ -52,13 +52,15 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
+    const targetRole = data.role === UserRoleType.SUPER_ADMIN ? UserRoleType.ADMIN : data.role;
+
     return this.prisma.user.create({
       data: {
         tenantId,
         email,
         name: data.name,
         passwordHash,
-        role: data.role,
+        role: targetRole,
         storeId: data.storeId,
       },
       select: {
@@ -79,7 +81,9 @@ export class UsersService {
     const updateData: any = {};
     if (data.name) updateData.name = data.name;
     if (data.email) updateData.email = data.email.trim().toLowerCase();
-    if (data.role) updateData.role = data.role;
+    if (data.role) {
+      updateData.role = data.role === UserRoleType.SUPER_ADMIN ? UserRoleType.ADMIN : data.role;
+    }
     if (data.storeId !== undefined) updateData.storeId = data.storeId;
     if (data.active !== undefined) updateData.active = data.active;
     if (data.password) {

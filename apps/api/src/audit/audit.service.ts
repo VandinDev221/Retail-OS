@@ -19,6 +19,26 @@ export class AuditService {
 
   constructor(private prisma: PrismaService) {}
 
+  private sanitize(data: any): any {
+    if (!data) return data;
+    const cloned = JSON.parse(JSON.stringify(data));
+    const sensitiveKeys = ['password', 'passwordhash', 'token', 'refreshtoken', 'secret', 'stripekey', 'creditcard'];
+
+    const recursiveClean = (obj: any) => {
+      if (typeof obj !== 'object' || obj === null) return;
+      for (const key of Object.keys(obj)) {
+        if (sensitiveKeys.includes(key.toLowerCase())) {
+          obj[key] = '[REDACTED_SENSITIVE_DATA]';
+        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+          recursiveClean(obj[key]);
+        }
+      }
+    };
+
+    recursiveClean(cloned);
+    return cloned;
+  }
+
   async log(params: CreateAuditLogParams): Promise<void> {
     try {
       await this.prisma.auditLog.create({
@@ -28,8 +48,8 @@ export class AuditService {
           action: params.action,
           entity: params.entity,
           entityId: params.entityId,
-          oldData: params.oldData ? JSON.parse(JSON.stringify(params.oldData)) : undefined,
-          newData: params.newData ? JSON.parse(JSON.stringify(params.newData)) : undefined,
+          oldData: params.oldData ? this.sanitize(params.oldData) : undefined,
+          newData: params.newData ? this.sanitize(params.newData) : undefined,
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,
         },

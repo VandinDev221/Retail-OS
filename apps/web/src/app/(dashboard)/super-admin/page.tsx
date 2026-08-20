@@ -540,9 +540,9 @@ export default function SuperAdminPlatformPage() {
 
       {/* ABA PLANOS SAAS */}
       {tab === 'plans' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl">
           {loadingPlans ? (
-            <div className="col-span-2 text-center p-8 text-zinc-500">Carregando planos...</div>
+            <div className="col-span-3 text-center p-8 text-zinc-500">Carregando planos...</div>
           ) : (
             plans?.map((plan: any) => (
               <div key={plan.id} className="bg-surface border border-surface-border rounded-2xl p-6 shadow-xl space-y-4">

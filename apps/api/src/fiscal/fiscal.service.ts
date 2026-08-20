@@ -40,13 +40,19 @@ export class FiscalService {
 
     if (!sale) throw new NotFoundException('Venda não encontrada');
 
-    // Verificar se já existe documento emitido
+    // Verificar se já existe documento emitido ou em processamento (Idempotência Fiscal)
     const existingDoc = await this.prisma.fiscalDocument.findFirst({
-      where: { saleId: sale.id, status: FiscalStatus.AUTHORIZED },
+      where: {
+        saleId: sale.id,
+        status: { in: [FiscalStatus.AUTHORIZED, FiscalStatus.PROCESSING, FiscalStatus.PENDING] },
+      },
     });
 
     if (existingDoc) {
-      throw new BadRequestException('Esta venda já possui NFC-e autorizada');
+      if (existingDoc.status === FiscalStatus.AUTHORIZED) {
+        throw new BadRequestException('Esta venda já possui documento fiscal autorizado (SEFAZ)');
+      }
+      return existingDoc;
     }
 
     // Chamar provedor fiscal

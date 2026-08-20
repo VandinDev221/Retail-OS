@@ -3,11 +3,14 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubscriptionsService, CreatePlanDto, CheckoutSubscriptionDto } from './subscriptions.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRoleType, SubscriptionStatus } from '@prisma/client';
 
 @ApiTags('Assinaturas & Stripe SaaS')
 @ApiBearerAuth()
 @Controller('subscriptions')
+@UseGuards(RolesGuard)
 export class SubscriptionsController {
   constructor(private subscriptionsService: SubscriptionsService) {}
 
@@ -19,6 +22,7 @@ export class SubscriptionsController {
   }
 
   @Post('plans')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Criar / Editar Plano (Apenas Super Admin)' })
   async upsertPlan(@CurrentUser('role') role: UserRoleType, @Body() dto: CreatePlanDto) {
     return this.subscriptionsService.upsertPlan(dto);
@@ -70,12 +74,14 @@ export class SubscriptionsController {
   // --- PLATAFORMA SUPER ADMIN ---
 
   @Get('superadmin/tenants')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Listar todas as empresas e assinaturas da plataforma (Apenas Super Admin)' })
   async superAdminListTenants(@CurrentUser('role') role: UserRoleType) {
     return this.subscriptionsService.superAdminListTenants(role);
   }
 
   @Post('superadmin/tenants')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Criar nova Empresa / Tenant (Apenas Super Admin)' })
   async superAdminCreateTenant(
     @CurrentUser('role') role: UserRoleType,
@@ -85,6 +91,7 @@ export class SubscriptionsController {
   }
 
   @Put('superadmin/tenants/:id')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Editar Empresa / Tenant (Apenas Super Admin)' })
   async superAdminUpdateTenant(
     @CurrentUser('role') role: UserRoleType,
@@ -95,6 +102,7 @@ export class SubscriptionsController {
   }
 
   @Put('superadmin/tenants/:id/status')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Ativar, Suspender ou Bloquear Empresa (Apenas Super Admin)' })
   async superAdminUpdateTenantStatus(
     @CurrentUser('role') role: UserRoleType,
@@ -106,18 +114,21 @@ export class SubscriptionsController {
   }
 
   @Delete('superadmin/tenants/:id')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Excluir Empresa / Tenant (Apenas Super Admin)' })
   async superAdminDeleteTenant(@CurrentUser('role') role: UserRoleType, @Param('id') tenantId: string) {
     return this.subscriptionsService.superAdminDeleteTenant(role, tenantId);
   }
 
   @Get('superadmin/users')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Listar todos os Usuários da Plataforma (Apenas Super Admin)' })
   async superAdminListUsers(@CurrentUser('role') role: UserRoleType) {
     return this.subscriptionsService.superAdminListUsers(role);
   }
 
   @Post('superadmin/users')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Criar Usuário para qualquer Empresa (Apenas Super Admin)' })
   async superAdminCreateUser(
     @CurrentUser('role') role: UserRoleType,
@@ -127,6 +138,7 @@ export class SubscriptionsController {
   }
 
   @Put('superadmin/users/:id')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Editar Usuário da Plataforma (Apenas Super Admin)' })
   async superAdminUpdateUser(
     @CurrentUser('role') role: UserRoleType,
@@ -137,12 +149,14 @@ export class SubscriptionsController {
   }
 
   @Delete('superadmin/users/:id')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Excluir Usuário da Plataforma (Apenas Super Admin)' })
   async superAdminDeleteUser(@CurrentUser('role') role: UserRoleType, @Param('id') userId: string) {
     return this.subscriptionsService.superAdminDeleteUser(role, userId);
   }
 
   @Get('superadmin/logs')
+  @Roles(UserRoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Monitoramento de Logs e Saúde da Plataforma (Apenas Super Admin)' })
   async superAdminGetSystemLogs(@CurrentUser('role') role: UserRoleType) {
     return this.subscriptionsService.superAdminGetSystemLogs(role);
