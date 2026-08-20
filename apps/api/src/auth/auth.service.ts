@@ -146,8 +146,28 @@ export class AuthService {
   }
 
   async googleAuth(dto: GoogleAuthDto) {
-    const email = dto.email.trim().toLowerCase();
-    const name = dto.name.trim() || 'Usuário Google';
+    let email = dto.email?.trim()?.toLowerCase();
+    let name = dto.name?.trim() || 'Usuário Google';
+
+    // Validação server-side do idToken do Google se fornecido
+    if (dto.idToken) {
+      try {
+        const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${dto.idToken}`);
+        if (res.ok) {
+          const googleInfo = await res.json();
+          if (googleInfo.email) {
+            email = googleInfo.email.trim().toLowerCase();
+            if (googleInfo.name) name = googleInfo.name.trim();
+          }
+        }
+      } catch (tokenErr) {
+        console.error('Erro ao validar idToken na API do Google:', tokenErr);
+      }
+    }
+
+    if (!email) {
+      throw new BadRequestException('E-mail do Google não identificado ou token inválido.');
+    }
 
     // Procurar se o usuário já existe
     let user = await this.prisma.user.findFirst({

@@ -92,8 +92,8 @@ export default function LoginPage() {
               setError('Não foi possível obter o e-mail da conta Google.');
             }
           })
-          .catch(() => {
-            setError('Falha ao autenticar token do Google.');
+          .catch((err: any) => {
+            setError(err?.response?.data?.message || err?.message || 'Falha ao autenticar token do Google.');
           })
           .finally(() => {
             setGoogleLoading(false);
