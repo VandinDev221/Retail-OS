@@ -18,6 +18,12 @@ const queryClient = new QueryClient({
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
+      <head>
+        <title>Retail OS</title>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body className="bg-background text-foreground antialiased min-h-screen">
         <QueryClientProvider client={queryClient}>
           <AuthProvider>{children}</AuthProvider>

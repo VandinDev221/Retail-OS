@@ -42,9 +42,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
         {/* Brand Header */}
         <div className="p-5 border-b border-surface-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-primary-500/20">
-              R
-            </div>
+            <img src="/logo.png" alt="Retail OS" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-primary-500/20" />
             <div>
               <h1 className="font-bold text-lg text-white tracking-wide">Retail OS</h1>
               <p className="text-xs text-primary-400 font-medium">SaaS Conveniência</p>

@@ -172,9 +172,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-primary-500 rounded-2xl mx-auto flex items-center justify-center font-black text-black text-3xl shadow-xl shadow-primary-500/20 mb-4">
-            R
-          </div>
+          <img src="/logo.png" alt="Retail OS" className="w-16 h-16 rounded-full mx-auto object-cover shadow-xl shadow-primary-500/20 mb-4" />
           <h1 className="text-2xl font-bold text-white tracking-tight">Retail OS</h1>
           <p className="text-sm text-zinc-400 mt-1">Sistema de Gestão & Frente de Caixa</p>
         </div>
