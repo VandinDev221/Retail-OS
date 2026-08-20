@@ -53,53 +53,63 @@ async function main() {
   // 0. Criar / Atualizar Planos de Assinatura SaaS
   const planStarter = await prisma.plan.upsert({
     where: { slug: 'starter' },
-    update: {},
-    create: {
-      name: 'Plano Starter',
-      slug: 'starter',
+    update: {
+      name: 'RetailSyn Plano Starter',
       description: 'Ideal para 1 loja de conveniência ou minimercado individual.',
-      priceMonthly: 99.0,
-      priceYearly: 990.0,
+      priceMonthly: 159.99,
+      priceYearly: 1499.99,
       maxStores: 1,
       maxUsers: 3,
-      maxProducts: 2000,
+      maxProducts: 1000,
+      active: true,
+    },
+    create: {
+      name: 'RetailSyn Plano Starter',
+      slug: 'starter',
+      description: 'Ideal para 1 loja de conveniência ou minimercado individual.',
+      priceMonthly: 159.99,
+      priceYearly: 1499.99,
+      maxStores: 1,
+      maxUsers: 3,
+      maxProducts: 1000,
       active: true,
     },
   });
 
   const planPro = await prisma.plan.upsert({
     where: { slug: 'pro' },
-    update: {},
-    create: {
-      name: 'Plano Pro',
-      slug: 'pro',
-      description: 'Para redes de até 3 lojas com módulo fiscal e FEFO avançado.',
-      priceMonthly: 199.0,
-      priceYearly: 1990.0,
+    update: {
+      name: 'RetailSyn Plano Pro',
+      description: 'Para redes de até 3 lojas',
+      priceMonthly: 249.99,
+      priceYearly: 1999.99,
       maxStores: 3,
       maxUsers: 10,
-      maxProducts: 10000,
+      maxProducts: 1000,
       active: true,
     },
-  });
-
-  const planEnterprise = await prisma.plan.upsert({
-    where: { slug: 'enterprise' },
-    update: {},
     create: {
-      name: 'Plano Enterprise',
-      slug: 'enterprise',
-      description: 'Lojas, usuários e produtos ilimitados com suporte prioritário 24/7.',
-      priceMonthly: 499.0,
-      priceYearly: 4990.0,
-      maxStores: 999,
-      maxUsers: 999,
-      maxProducts: 999999,
+      name: 'RetailSyn Plano Pro',
+      slug: 'pro',
+      description: 'Para redes de até 3 lojas',
+      priceMonthly: 249.99,
+      priceYearly: 1999.99,
+      maxStores: 3,
+      maxUsers: 10,
+      maxProducts: 1000,
       active: true,
     },
   });
 
-  console.log('✅ Planos SaaS criados: Starter (R$ 99), Pro (R$ 199), Enterprise (R$ 499)');
+  // Deativar outros planos antigos se existirem
+  await prisma.plan.updateMany({
+    where: {
+      slug: { notIn: ['starter', 'pro'] },
+    },
+    data: { active: false },
+  });
+
+  console.log('✅ Planos SaaS configurados: RetailSyn Plano Starter (R$ 159,99) e RetailSyn Plano Pro (R$ 249,99)');
 
   // 1. Criar ou atualizar Tenant principal
   let tenant = await prisma.tenant.findUnique({

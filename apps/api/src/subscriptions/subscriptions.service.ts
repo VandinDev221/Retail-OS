@@ -36,8 +36,37 @@ export class SubscriptionsService {
     return new StripeClass(stripeSecretKey);
   }
 
-  // Listar Planos Ativos (Buscando dinamicamente da API da Stripe)
+  // Listar Planos Ativos (Exibindo estritamente os dois planos oficiais)
   async getPlans() {
+    const defaultPlans = [
+      {
+        id: 'prod_V6bw5XekJTmQMD',
+        name: 'RetailSyn Plano Starter',
+        slug: 'starter',
+        description: 'Ideal para 1 loja de conveniência ou minimercado individual.',
+        priceMonthly: 159.99,
+        priceYearly: 1499.99,
+        stripePriceIdMonthly: null,
+        stripePriceIdYearly: null,
+        maxStores: 1,
+        maxUsers: 3,
+        maxProducts: 1000,
+      },
+      {
+        id: 'prod_V6cdBztmqGbm0M',
+        name: 'RetailSyn Plano Pro',
+        slug: 'pro',
+        description: 'Para redes de até 3 lojas',
+        priceMonthly: 249.99,
+        priceYearly: 1999.99,
+        stripePriceIdMonthly: null,
+        stripePriceIdYearly: null,
+        maxStores: 3,
+        maxUsers: 10,
+        maxProducts: 1000,
+      },
+    ];
+
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
 
     if (stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.trim().length > 5) {
@@ -52,43 +81,50 @@ export class SubscriptionsService {
         if (productsRes?.data?.length > 0 && pricesRes?.data?.length > 0) {
           const productsMap = new Map<string, any>();
 
-          productsRes.data.forEach((prod) => {
-            productsMap.set(prod.id, {
-              id: prod.id,
-              name: prod.name,
-              slug: prod.metadata?.slug || prod.id,
-              description: prod.description || '',
-              priceMonthly: 0,
-              priceYearly: 0,
-              stripePriceIdMonthly: null,
-              stripePriceIdYearly: null,
-              maxStores: parseInt(prod.metadata?.max_stores || '1', 10),
-              maxUsers: parseInt(prod.metadata?.max_users || '5', 10),
-              maxProducts: parseInt(prod.metadata?.max_products || '1000', 10),
-            });
+          productsRes.data.forEach((prod: any) => {
+            const isStarter = prod.id === 'prod_V6bw5XekJTmQMD' || prod.name?.toLowerCase().includes('starter');
+            const isPro = prod.id === 'prod_V6cdBztmqGbm0M' || prod.name?.toLowerCase().includes('pro');
+
+            if (isStarter || isPro) {
+              const planId = isStarter ? 'prod_V6bw5XekJTmQMD' : 'prod_V6cdBztmqGbm0M';
+              productsMap.set(prod.id, {
+                id: planId,
+                name: isStarter ? 'RetailSyn Plano Starter' : 'RetailSyn Plano Pro',
+                slug: isStarter ? 'starter' : 'pro',
+                description: isStarter
+                  ? 'Ideal para 1 loja de conveniência ou minimercado individual.'
+                  : 'Para redes de até 3 lojas',
+                priceMonthly: isStarter ? 159.99 : 249.99,
+                priceYearly: isStarter ? 1499.99 : 1999.99,
+                stripePriceIdMonthly: null,
+                stripePriceIdYearly: null,
+                maxStores: isStarter ? 1 : 3,
+                maxUsers: isStarter ? 3 : 10,
+                maxProducts: 1000,
+              });
+            }
           });
 
-          pricesRes.data.forEach((p) => {
-            const prodId = typeof p.product === 'string' ? p.product : (p.product as any)?.id;
+          pricesRes.data.forEach((p: any) => {
+            const prodId = typeof p.product === 'string' ? p.product : p.product?.id;
             if (!prodId || !productsMap.has(prodId)) return;
 
             const item = productsMap.get(prodId);
             const amount = p.unit_amount ? p.unit_amount / 100 : 0;
 
             if (p.recurring?.interval === 'year') {
-              item.priceYearly = amount;
+              if (amount > 0) item.priceYearly = amount;
               item.stripePriceIdYearly = p.id;
-              if (item.priceMonthly === 0) item.priceMonthly = Math.round(amount / 12);
             } else {
-              item.priceMonthly = amount;
+              if (amount > 0) item.priceMonthly = amount;
               item.stripePriceIdMonthly = p.id;
-              if (item.priceYearly === 0) item.priceYearly = amount * 10;
             }
           });
 
-          const stripeList = Array.from(productsMap.values()).filter((p) => p.priceMonthly > 0 || p.priceYearly > 0);
+          const stripeList = Array.from(productsMap.values());
           if (stripeList.length > 0) {
-            return stripeList;
+            // Ordenar: Starter primeiro, Pro depois
+            return stripeList.sort((a: any, b: any) => a.priceMonthly - b.priceMonthly);
           }
         }
       } catch (stripeErr) {
@@ -96,10 +132,7 @@ export class SubscriptionsService {
       }
     }
 
-    return this.prisma.plan.findMany({
-      where: { active: true },
-      orderBy: { priceMonthly: 'asc' },
-    });
+    return defaultPlans;
   }
 
   // Criar ou Atualizar Plano (Apenas Super Admin)

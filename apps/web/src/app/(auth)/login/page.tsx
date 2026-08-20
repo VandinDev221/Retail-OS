@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regStoreName, setRegStoreName] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro'>('pro');
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
 
   const [loading, setLoading] = useState(false);
@@ -497,7 +497,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Grid dos Cards de Seleção de Plano */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Plano Starter */}
                   <div
                     onClick={() => setSelectedPlan('starter')}
@@ -509,17 +509,23 @@ export default function LoginPage() {
                   >
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-sm text-white">Starter</span>
+                        <span className="font-bold text-sm text-white">RetailSyn Plano Starter</span>
                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                           selectedPlan === 'starter' ? 'border-primary-400 bg-primary-500' : 'border-zinc-600'
                         }`}>
                           {selectedPlan === 'starter' && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
                         </div>
                       </div>
-                      <p className="text-[11px] text-zinc-400 mb-2">Ideal para 1 loja individual</p>
+                      <p className="text-[11px] text-zinc-400 mb-2">Ideal para 1 loja de conveniência ou minimercado individual.</p>
+                      <div className="text-[10px] text-zinc-500 font-mono mb-2">prod_V6bw5XekJTmQMD</div>
+                      <ul className="text-[11px] text-zinc-300 space-y-1 mb-3">
+                        <li>• Até 1 Loja</li>
+                        <li>• Até 3 Usuários</li>
+                        <li>• Até 1000 Produtos Cadastrados</li>
+                      </ul>
                     </div>
-                    <div className="text-emerald-400 font-mono font-black text-lg">
-                      {billingCycle === 'YEARLY' ? 'R$ 79/mês' : 'R$ 99/mês'}
+                    <div className="text-emerald-400 font-mono font-black text-base pt-2 border-t border-surface-border">
+                      {billingCycle === 'YEARLY' ? 'R$ 1.499,99 /ano' : 'R$ 159,99 /mês'}
                     </div>
                   </div>
 
@@ -537,42 +543,23 @@ export default function LoginPage() {
                     </span>
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-sm text-white">Pro</span>
+                        <span className="font-bold text-sm text-white">RetailSyn Plano Pro</span>
                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                           selectedPlan === 'pro' ? 'border-primary-400 bg-primary-500' : 'border-zinc-600'
                         }`}>
                           {selectedPlan === 'pro' && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
                         </div>
                       </div>
-                      <p className="text-[11px] text-zinc-400 mb-2">Até 3 lojas com emissão fiscal</p>
+                      <p className="text-[11px] text-zinc-400 mb-2">Para redes de até 3 lojas</p>
+                      <div className="text-[10px] text-zinc-500 font-mono mb-2">prod_V6cdBztmqGbm0M</div>
+                      <ul className="text-[11px] text-zinc-300 space-y-1 mb-3">
+                        <li>• Até 3 Lojas</li>
+                        <li>• Até 10 Usuários</li>
+                        <li>• Até 1000 Produtos Cadastrados</li>
+                      </ul>
                     </div>
-                    <div className="text-emerald-400 font-mono font-black text-lg">
-                      {billingCycle === 'YEARLY' ? 'R$ 159/mês' : 'R$ 199/mês'}
-                    </div>
-                  </div>
-
-                  {/* Plano Enterprise */}
-                  <div
-                    onClick={() => setSelectedPlan('enterprise')}
-                    className={`cursor-pointer p-4 rounded-xl border transition flex flex-col justify-between ${
-                      selectedPlan === 'enterprise'
-                        ? 'bg-primary-500/10 border-primary-500 shadow-md shadow-primary-500/10'
-                        : 'bg-surface-card border-surface-border hover:border-zinc-700'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-sm text-white">Enterprise</span>
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          selectedPlan === 'enterprise' ? 'border-primary-400 bg-primary-500' : 'border-zinc-600'
-                        }`}>
-                          {selectedPlan === 'enterprise' && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
-                        </div>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 mb-2">Lojas e usuários ilimitados</p>
-                    </div>
-                    <div className="text-emerald-400 font-mono font-black text-lg">
-                      {billingCycle === 'YEARLY' ? 'R$ 399/mês' : 'R$ 499/mês'}
+                    <div className="text-emerald-400 font-mono font-black text-base pt-2 border-t border-surface-border">
+                      {billingCycle === 'YEARLY' ? 'R$ 1.999,99 /ano' : 'R$ 249,99 /mês'}
                     </div>
                   </div>
                 </div>
