@@ -19,9 +19,9 @@ interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
   loading: boolean;
-  login: (data: { email: string; password: string; tenantSlug?: string }) => Promise<void>;
-  register: (data: { name: string; email: string; password: string; storeName?: string; planSlug?: string; billingCycle?: 'MONTHLY' | 'YEARLY' }) => Promise<{ checkoutUrl?: string; message?: string }>;
-  loginWithGoogle: (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => Promise<{ checkoutUrl?: string; message?: string }>;
+  login: (data: { email: string; password: string; tenantSlug?: string }) => Promise<UserProfile>;
+  register: (data: { name: string; email: string; password: string; storeName?: string; planSlug?: string; billingCycle?: 'MONTHLY' | 'YEARLY' }) => Promise<{ checkoutUrl?: string; message?: string; user?: UserProfile }>;
+  loginWithGoogle: (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => Promise<{ checkoutUrl?: string; message?: string; user?: UserProfile }>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
 }
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (data: { email: string; password: string; tenantSlug?: string }) => {
+  const login = async (data: { email: string; password: string; tenantSlug?: string }): Promise<UserProfile> => {
     const res = await api.post('/auth/login', data);
     const { accessToken, refreshToken, user: userData } = res.data;
 
@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_token', accessToken);
     localStorage.setItem('retail_os_refresh_token', refreshToken);
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
+    return userData;
   };
 
   const register = async (data: { name: string; email: string; password: string; storeName?: string; planSlug?: string; billingCycle?: 'MONTHLY' | 'YEARLY' }) => {
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_token', accessToken);
     localStorage.setItem('retail_os_refresh_token', refreshToken);
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
-    return {};
+    return { user: userData };
   };
 
   const loginWithGoogle = async (data: { email: string; name: string; googleId?: string; idToken?: string; tenantSlug?: string }) => {
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('retail_os_token', accessToken);
     localStorage.setItem('retail_os_refresh_token', refreshToken);
     localStorage.setItem('retail_os_user', JSON.stringify(userData));
-    return {};
+    return { user: userData };
   };
 
   const logout = () => {

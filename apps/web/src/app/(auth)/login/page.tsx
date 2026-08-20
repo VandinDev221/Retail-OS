@@ -81,6 +81,10 @@ export default function LoginPage() {
               });
               if (res?.checkoutUrl) {
                 window.location.href = res.checkoutUrl;
+              } else if (res?.user?.role === 'SUPER_ADMIN') {
+                router.push('/super-admin');
+              } else if (res?.user?.role === 'CAIXA') {
+                router.push('/pos');
               } else {
                 router.push('/');
               }
@@ -118,12 +122,18 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login({ 
+      const loggedUser = await login({ 
         email: email.trim(), 
         password, 
         tenantSlug: tenantSlug.trim() || undefined 
       });
-      router.push('/');
+      if (loggedUser?.role === 'SUPER_ADMIN') {
+        router.push('/super-admin');
+      } else if (loggedUser?.role === 'CAIXA') {
+        router.push('/pos');
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'E-mail ou senha incorretos.');
     } finally {
@@ -149,6 +159,8 @@ export default function LoginPage() {
 
       if (res?.checkoutUrl) {
         window.location.href = res.checkoutUrl;
+      } else if (res?.user?.role === 'SUPER_ADMIN') {
+        router.push('/super-admin');
       } else {
         router.push('/');
       }
@@ -179,6 +191,8 @@ export default function LoginPage() {
             });
             if (res?.checkoutUrl) {
               window.location.href = res.checkoutUrl;
+            } else if (res?.user?.role === 'SUPER_ADMIN') {
+              router.push('/super-admin');
             } else {
               router.push('/');
             }

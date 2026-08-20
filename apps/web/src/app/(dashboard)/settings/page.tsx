@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { formatDate, formatCurrency } from '../../../lib/utils';
+import { useAuth } from '../../../context/auth-context';
 import {
   Settings,
   Users,
@@ -19,6 +20,8 @@ import {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const [tab, setTab] = useState<'users' | 'tenant' | 'subscription' | 'audit'>('users');
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
 
@@ -60,7 +63,7 @@ export default function SettingsPage() {
       const res = await api.get('/audit');
       return res.data;
     },
-    enabled: tab === 'audit',
+    enabled: tab === 'audit' && isSuperAdmin,
   });
 
   // Mutation para Checkout na Stripe
@@ -96,7 +99,7 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Configurações & Administração</h1>
-        <p className="text-sm text-zinc-400">Usuários, permissões RBAC, plano de assinatura Stripe e auditoria</p>
+        <p className="text-sm text-zinc-400">Usuários, permissões RBAC e plano de assinatura Stripe</p>
       </div>
 
       {/* Tabs */}
@@ -134,17 +137,19 @@ export default function SettingsPage() {
           <Crown className="w-4 h-4 text-primary-400" />
           <span>Assinatura & Planos Stripe</span>
         </button>
-        <button
-          onClick={() => setTab('audit')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap ${
-            tab === 'audit'
-              ? 'border-primary-500 text-primary-400 bg-primary-500/5'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Logs de Auditoria</span>
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setTab('audit')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+              tab === 'audit'
+                ? 'border-primary-500 text-primary-400 bg-primary-500/5'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            <span>Logs de Auditoria</span>
+          </button>
+        )}
       </div>
 
       {/* ABA USUARIOS */}
@@ -272,7 +277,7 @@ export default function SettingsPage() {
       )}
 
       {/* ABA AUDITORIA */}
-      {tab === 'audit' && (
+      {tab === 'audit' && isSuperAdmin && (
         <div className="bg-surface border border-surface-border rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

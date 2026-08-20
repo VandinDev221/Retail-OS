@@ -54,7 +54,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     { label: 'Emissão Fiscal (NFe/NFCe)', icon: FileText, href: '/fiscal' },
     { label: 'Financeiro', icon: Receipt, href: '/finance' },
     { label: 'Relatórios & ABC', icon: FileSpreadsheet, href: '/reports' },
-    { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
+    { label: 'Configurações', icon: Settings, href: '/settings' },
   ];
 
   const menuItems = isSuperAdmin ? superAdminMenuItems : (isCaixa ? caixaMenuItems : storeMenuItems);
