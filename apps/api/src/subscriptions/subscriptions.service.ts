@@ -29,7 +29,7 @@ export class SubscriptionsService {
     private configService: ConfigService,
   ) {}
 
-  // Listar Planos Ativos (Buscando dinamicamente da API da Stripe se a chave estiver presente)
+  // Listar Planos Ativos (Buscando dinamicamente da API da Stripe)
   async getPlans() {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
 
@@ -37,36 +37,35 @@ export class SubscriptionsService {
       try {
         const stripe = new Stripe(stripeSecretKey);
 
-        const prices = await stripe.prices.list({
-          expand: ['data.product'],
-          active: true,
-        });
+        const [productsRes, pricesRes] = await Promise.all([
+          stripe.products.list({ active: true }),
+          stripe.prices.list({ active: true }),
+        ]);
 
-        if (prices?.data?.length > 0) {
+        if (productsRes?.data?.length > 0 && pricesRes?.data?.length > 0) {
           const productsMap = new Map<string, any>();
 
-          prices.data.forEach((p: any) => {
-            const product = p.product;
-            if (!product || typeof product === 'string' || !product.active) return;
+          productsRes.data.forEach((prod) => {
+            productsMap.set(prod.id, {
+              id: prod.id,
+              name: prod.name,
+              slug: prod.metadata?.slug || prod.name.toLowerCase().replace(/[^a-z0-9]/gi, '-'),
+              description: prod.description || '',
+              priceMonthly: 0,
+              priceYearly: 0,
+              stripePriceIdMonthly: null,
+              stripePriceIdYearly: null,
+              maxStores: parseInt(prod.metadata?.max_stores || '1', 10),
+              maxUsers: parseInt(prod.metadata?.max_users || '5', 10),
+              maxProducts: parseInt(prod.metadata?.max_products || '1000', 10),
+            });
+          });
 
-            const productId = product.id;
-            if (!productsMap.has(productId)) {
-              productsMap.set(productId, {
-                id: product.id,
-                name: product.name,
-                slug: product.metadata?.slug || product.name.toLowerCase().replace(/[^a-z0-9]/gi, '-'),
-                description: product.description || '',
-                priceMonthly: 0,
-                priceYearly: 0,
-                stripePriceIdMonthly: null,
-                stripePriceIdYearly: null,
-                maxStores: parseInt(product.metadata?.max_stores || '1', 10),
-                maxUsers: parseInt(product.metadata?.max_users || '5', 10),
-                maxProducts: parseInt(product.metadata?.max_products || '1000', 10),
-              });
-            }
+          pricesRes.data.forEach((p) => {
+            const prodId = typeof p.product === 'string' ? p.product : (p.product as any)?.id;
+            if (!prodId || !productsMap.has(prodId)) return;
 
-            const item = productsMap.get(productId);
+            const item = productsMap.get(prodId);
             const amount = p.unit_amount ? p.unit_amount / 100 : 0;
 
             if (p.recurring?.interval === 'year') {
@@ -80,13 +79,13 @@ export class SubscriptionsService {
             }
           });
 
-          const stripeList = Array.from(productsMap.values());
+          const stripeList = Array.from(productsMap.values()).filter((p) => p.priceMonthly > 0 || p.priceYearly > 0);
           if (stripeList.length > 0) {
             return stripeList;
           }
         }
       } catch (stripeErr) {
-        console.error('Erro ao buscar planos diretamente da API da Stripe:', stripeErr);
+        console.error('Erro ao buscar produtos e preços diretamente da Stripe API:', stripeErr);
       }
     }
 
