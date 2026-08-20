@@ -46,12 +46,15 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } catch (refreshErr) {
-          localStorage.removeItem('retail_os_token');
-          localStorage.removeItem('retail_os_refresh_token');
-          localStorage.removeItem('retail_os_user');
+          localStorage.clear();
           if (!window.location.pathname.includes('/login')) {
             window.location.href = '/login';
           }
+        }
+      } else {
+        localStorage.clear();
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
         }
       }
     }
