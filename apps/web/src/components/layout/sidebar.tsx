@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -12,15 +12,15 @@ import {
   Wallet,
   FileSpreadsheet,
   Settings,
-  Users,
   LogOut,
   Receipt,
-  Clock,
+  X,
+  Menu,
 } from 'lucide-react';
 import { useAuth } from '../../context/auth-context';
 import { cn } from '../../lib/utils';
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; setMobileOpen?: (open: boolean) => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -36,18 +36,25 @@ export function Sidebar() {
     { label: 'Configurações & Logs', icon: Settings, href: '/settings' },
   ];
 
-  return (
-    <aside className="w-64 bg-surface border-r border-surface-border flex flex-col justify-between h-screen sticky top-0">
+  const content = (
+    <div className="flex flex-col justify-between h-full bg-surface border-r border-surface-border">
       <div>
         {/* Brand Header */}
-        <div className="p-6 border-b border-surface-border flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-primary-500/20">
-            R
+        <div className="p-5 border-b border-surface-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-primary-500/20">
+              R
+            </div>
+            <div>
+              <h1 className="font-bold text-lg text-white tracking-wide">Retail OS</h1>
+              <p className="text-xs text-primary-400 font-medium">SaaS Conveniência</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-lg text-white tracking-wide">Retail OS</h1>
-            <p className="text-xs text-primary-400 font-medium">SaaS Conveniência</p>
-          </div>
+          {setMobileOpen && (
+            <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1.5 text-zinc-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Menu */}
@@ -60,10 +67,11 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setMobileOpen && setMobileOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-primary-500/15 text-primary-400 border border-primary-500/30'
+                    ? 'bg-primary-500/15 text-primary-400 border border-primary-500/30 font-bold'
                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-card',
                   item.highlight && !isActive && 'text-primary-400/90 font-semibold',
                 )}
@@ -97,6 +105,21 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:block w-64 h-screen sticky top-0 flex-shrink-0">{content}</aside>
+
+      {/* Mobile Drawer Overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 lg:hidden flex">
+          <div className="w-72 h-full">{content}</div>
+          <div className="flex-1" onClick={() => setMobileOpen && setMobileOpen(false)} />
+        </div>
+      )}
+    </>
   );
 }
