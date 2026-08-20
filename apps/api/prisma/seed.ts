@@ -101,15 +101,40 @@ async function main() {
     },
   });
 
-  // Deativar outros planos antigos se existirem
+  const planEnterprise = await prisma.plan.upsert({
+    where: { slug: 'enterprise' },
+    update: {
+      name: 'RetailSyn Interprise',
+      description: 'Ideal para grandes redes, lojas e usuários ilimitados.',
+      priceMonthly: 499.99,
+      priceYearly: 3799.99,
+      maxStores: 999,
+      maxUsers: 999,
+      maxProducts: 999999,
+      active: true,
+    },
+    create: {
+      name: 'RetailSyn Interprise',
+      slug: 'enterprise',
+      description: 'Ideal para grandes redes, lojas e usuários ilimitados.',
+      priceMonthly: 499.99,
+      priceYearly: 3799.99,
+      maxStores: 999,
+      maxUsers: 999,
+      maxProducts: 999999,
+      active: true,
+    },
+  });
+
+  // Manter ativos estritamente os 3 planos oficiais
   await prisma.plan.updateMany({
     where: {
-      slug: { notIn: ['starter', 'pro'] },
+      slug: { notIn: ['starter', 'pro', 'enterprise'] },
     },
     data: { active: false },
   });
 
-  console.log('✅ Planos SaaS configurados: RetailSyn Plano Starter (R$ 159,99) e RetailSyn Plano Pro (R$ 249,99)');
+  console.log('✅ Planos SaaS configurados: Starter (R$ 159,99), Pro (R$ 249,99) e Interprise (R$ 499,99)');
 
   // 1. Criar ou atualizar Tenant principal
   let tenant = await prisma.tenant.findUnique({

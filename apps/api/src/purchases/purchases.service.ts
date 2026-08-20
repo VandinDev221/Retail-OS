@@ -183,11 +183,24 @@ export class PurchasesService {
           },
         });
 
-        // Atualizar custo no cadastro do produto
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { costPrice: item.unitCost },
-        });
+        // Recalcular Custo Médio Ponderado no cadastro do produto
+        const existingProduct = await tx.product.findUnique({ where: { id: item.productId } });
+        if (existingProduct) {
+          const oldBalance = currentBalance ? Number(currentBalance.quantity) : 0;
+          const oldCost = Number(existingProduct.costPrice || 0);
+          const newPurchasedQty = item.quantity;
+          const newPurchasedCost = item.unitCost;
+
+          let updatedWeightedCost = newPurchasedCost;
+          if (oldBalance > 0 && newQty > 0) {
+            updatedWeightedCost = (oldBalance * oldCost + newPurchasedQty * newPurchasedCost) / newQty;
+          }
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { costPrice: Number(updatedWeightedCost.toFixed(2)) },
+          });
+        }
       }
 
       // 4. Lançar no Contas a Pagar

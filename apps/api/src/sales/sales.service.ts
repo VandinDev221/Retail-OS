@@ -199,23 +199,29 @@ export class SalesService {
             // Seleção de Lote via algoritmo FEFO se o produto controla lotes
             let selectedLotId = item.lotId;
             if (product.trackLots && !selectedLotId) {
-              const earliestLot = await tx.stockLot.findFirst({
+              const activeLots = await tx.stockLot.findMany({
                 where: {
                   storeId: dto.storeId,
                   productId: product.id,
-                  quantity: { gte: item.quantity },
+                  quantity: { gt: 0 },
                   active: true,
                 },
                 orderBy: { expirationDate: 'asc' }, // FEFO
               });
 
-              if (earliestLot) {
-                selectedLotId = earliestLot.id;
-                // Baixar do lote
+              let remainingQtyToDeduct = item.quantity;
+              for (const lot of activeLots) {
+                if (remainingQtyToDeduct <= 0) break;
+                const currentLotQty = Number(lot.quantity);
+                const deduct = Math.min(currentLotQty, remainingQtyToDeduct);
+
                 await tx.stockLot.update({
-                  where: { id: earliestLot.id },
-                  data: { quantity: Number(earliestLot.quantity) - item.quantity },
+                  where: { id: lot.id },
+                  data: { quantity: currentLotQty - deduct },
                 });
+
+                if (!selectedLotId) selectedLotId = lot.id;
+                remainingQtyToDeduct -= deduct;
               }
             } else if (selectedLotId) {
               const lot = await tx.stockLot.findUnique({ where: { id: selectedLotId } });

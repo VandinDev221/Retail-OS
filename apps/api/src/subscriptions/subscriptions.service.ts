@@ -36,7 +36,7 @@ export class SubscriptionsService {
     return new StripeClass(stripeSecretKey);
   }
 
-  // Listar Planos Ativos (Exibindo estritamente os dois planos oficiais)
+  // Listar Planos Ativos (Exibindo estritamente os 3 planos oficiais e desduplicando)
   async getPlans() {
     const defaultPlans = [
       {
@@ -65,6 +65,19 @@ export class SubscriptionsService {
         maxUsers: 10,
         maxProducts: 1000,
       },
+      {
+        id: 'prod_enterprise',
+        name: 'RetailSyn Interprise',
+        slug: 'enterprise',
+        description: 'Ideal para grandes redes, lojas e usuários ilimitados.',
+        priceMonthly: 499.99,
+        priceYearly: 3799.99,
+        stripePriceIdMonthly: null,
+        stripePriceIdYearly: null,
+        maxStores: 999,
+        maxUsers: 999,
+        maxProducts: 999999,
+      },
     ];
 
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -79,62 +92,80 @@ export class SubscriptionsService {
         ]);
 
         if (productsRes?.data?.length > 0 && pricesRes?.data?.length > 0) {
-          const productsMap = new Map<string, any>();
+          const plansMap = new Map<string, any>();
 
           productsRes.data.forEach((prod: any) => {
-            const isStarter = prod.id === 'prod_V6bw5XekJTmQMD' || prod.name?.toLowerCase().includes('starter');
-            const isPro = prod.id === 'prod_V6cdBztmqGbm0M' || prod.name?.toLowerCase().includes('pro');
+            const nameLower = prod.name?.toLowerCase() || '';
+            const isStarter = prod.id === 'prod_V6bw5XekJTmQMD' || nameLower.includes('starter');
+            const isPro = prod.id === 'prod_V6cdBztmqGbm0M' || nameLower.includes('pro');
+            const isEnterprise = nameLower.includes('interprise') || nameLower.includes('enterprise');
 
-            if (isStarter || isPro) {
-              const planId = isStarter ? 'prod_V6bw5XekJTmQMD' : 'prod_V6cdBztmqGbm0M';
-              productsMap.set(prod.id, {
-                id: planId,
-                name: isStarter ? 'RetailSyn Plano Starter' : 'RetailSyn Plano Pro',
-                slug: isStarter ? 'starter' : 'pro',
-                description: isStarter
-                  ? 'Ideal para 1 loja de conveniência ou minimercado individual.'
-                  : 'Para redes de até 3 lojas',
-                priceMonthly: isStarter ? 159.99 : 249.99,
-                priceYearly: isStarter ? 1499.99 : 1999.99,
-                stripePriceIdMonthly: null,
-                stripePriceIdYearly: null,
-                maxStores: isStarter ? 1 : 3,
-                maxUsers: isStarter ? 3 : 10,
-                maxProducts: 1000,
-              });
+            if (isStarter || isPro || isEnterprise) {
+              const slug = isStarter ? 'starter' : isPro ? 'pro' : 'enterprise';
+              if (!plansMap.has(slug)) {
+                const planId = isStarter ? 'prod_V6bw5XekJTmQMD' : isPro ? 'prod_V6cdBztmqGbm0M' : prod.id;
+                plansMap.set(slug, {
+                  id: planId,
+                  name: isStarter ? 'RetailSyn Plano Starter' : isPro ? 'RetailSyn Plano Pro' : 'RetailSyn Interprise',
+                  slug,
+                  description: isStarter
+                    ? 'Ideal para 1 loja de conveniência ou minimercado individual.'
+                    : isPro
+                    ? 'Para redes de até 3 lojas'
+                    : 'Ideal para grandes redes, lojas e usuários ilimitados.',
+                  priceMonthly: isStarter ? 159.99 : isPro ? 249.99 : 499.99,
+                  priceYearly: isStarter ? 1499.99 : isPro ? 1999.99 : 3799.99,
+                  stripePriceIdMonthly: null,
+                  stripePriceIdYearly: null,
+                  maxStores: isStarter ? 1 : isPro ? 3 : 999,
+                  maxUsers: isStarter ? 3 : isPro ? 10 : 999,
+                  maxProducts: isStarter ? 1000 : isPro ? 1000 : 999999,
+                  stripeProdIds: [prod.id],
+                });
+              } else {
+                plansMap.get(slug).stripeProdIds.push(prod.id);
+              }
             }
           });
 
           pricesRes.data.forEach((p: any) => {
             const prodId = typeof p.product === 'string' ? p.product : p.product?.id;
-            if (!prodId || !productsMap.has(prodId)) return;
+            if (!prodId) return;
 
-            const item = productsMap.get(prodId);
-            const amount = p.unit_amount ? p.unit_amount / 100 : 0;
+            for (const item of plansMap.values()) {
+              if (item.stripeProdIds?.includes(prodId)) {
+                const amount = p.unit_amount ? p.unit_amount / 100 : 0;
+                const expectedPrice = item.slug === 'starter' ? 1499.99 : item.slug === 'pro' ? 1999.99 : 3799.99;
+                const expectedMonthlyPrice = item.slug === 'starter' ? 159.99 : item.slug === 'pro' ? 249.99 : 499.99;
 
-            if (p.recurring?.interval === 'year') {
-              if (amount > 0 && Math.abs(amount - (item.slug === 'starter' ? 1499.99 : 1999.99)) < 1) {
-                item.priceYearly = amount;
-                item.stripePriceIdYearly = p.id;
-              } else if (!item.stripePriceIdYearly) {
-                item.stripePriceIdYearly = p.id;
-              }
-            } else {
-              if (amount > 0 && Math.abs(amount - (item.slug === 'starter' ? 159.99 : 249.99)) < 1) {
-                item.priceMonthly = amount;
-                item.stripePriceIdMonthly = p.id;
-              } else if (!item.stripePriceIdMonthly) {
-                item.stripePriceIdMonthly = p.id;
+                if (p.recurring?.interval === 'year') {
+                  if (amount > 0 && Math.abs(amount - expectedPrice) < 5) {
+                    item.priceYearly = amount;
+                    item.stripePriceIdYearly = p.id;
+                  } else if (!item.stripePriceIdYearly) {
+                    item.stripePriceIdYearly = p.id;
+                  }
+                } else {
+                  if (amount > 0 && Math.abs(amount - expectedMonthlyPrice) < 5) {
+                    item.priceMonthly = amount;
+                    item.stripePriceIdMonthly = p.id;
+                  } else if (!item.stripePriceIdMonthly) {
+                    item.stripePriceIdMonthly = p.id;
+                  }
+                }
               }
             }
           });
 
-          // Garantir valores de tabela oficiais estritos
-          const stripeList = Array.from(productsMap.values()).map((item: any) => ({
-            ...item,
-            priceMonthly: item.slug === 'starter' ? 159.99 : 249.99,
-            priceYearly: item.slug === 'starter' ? 1499.99 : 1999.99,
-          }));
+          // Garantir valores de tabela oficiais estritos e sem duplicados
+          const stripeList = Array.from(plansMap.values()).map((item: any) => {
+            const { stripeProdIds, ...cleanItem } = item;
+            return {
+              ...cleanItem,
+              priceMonthly: cleanItem.slug === 'starter' ? 159.99 : cleanItem.slug === 'pro' ? 249.99 : 499.99,
+              priceYearly: cleanItem.slug === 'starter' ? 1499.99 : cleanItem.slug === 'pro' ? 1999.99 : 3799.99,
+            };
+          });
 
           if (stripeList.length > 0) {
             return stripeList.sort((a: any, b: any) => a.priceMonthly - b.priceMonthly);
