@@ -1,20 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
-import { formatDate } from '../../../lib/utils';
+import { formatDate, formatCurrency } from '../../../lib/utils';
 import {
   Settings,
   Users,
   Shield,
   History,
   Store,
-  Key,
+  CreditCard,
+  Zap,
+  CheckCircle,
+  ExternalLink,
+  Crown,
 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<'users' | 'tenant' | 'audit'>('users');
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<'users' | 'tenant' | 'subscription' | 'audit'>('users');
+  const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
 
   const { data: users, isLoading: loadingUsers } = useQuery({
     queryKey: ['users-list'],
@@ -32,6 +38,22 @@ export default function SettingsPage() {
     },
   });
 
+  const { data: subscription } = useQuery({
+    queryKey: ['my-subscription'],
+    queryFn: async () => {
+      const res = await api.get('/subscriptions/my-subscription');
+      return res.data;
+    },
+  });
+
+  const { data: plans } = useQuery({
+    queryKey: ['public-plans'],
+    queryFn: async () => {
+      const res = await api.get('/subscriptions/plans');
+      return res.data;
+    },
+  });
+
   const { data: auditLogs, isLoading: loadingAudit } = useQuery({
     queryKey: ['audit-logs'],
     queryFn: async () => {
@@ -41,18 +63,47 @@ export default function SettingsPage() {
     enabled: tab === 'audit',
   });
 
+  // Mutation para Checkout na Stripe
+  const stripeCheckoutMutation = useMutation({
+    mutationFn: async (planSlug: string) => {
+      const res = await api.post('/subscriptions/stripe/create-checkout-session', {
+        planSlug,
+        billingCycle,
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    },
+  });
+
+  // Mutation para abrir Portal do Cliente na Stripe
+  const stripePortalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post('/subscriptions/stripe/portal-session');
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data.portalUrl) {
+        window.location.href = data.portalUrl;
+      }
+    },
+  });
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Configurações & Administração</h1>
-        <p className="text-sm text-zinc-400">Usuários, permissões RBAC, dados da empresa e auditoria</p>
+        <p className="text-sm text-zinc-400">Usuários, permissões RBAC, plano de assinatura Stripe e auditoria</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-surface-border gap-2">
+      <div className="flex border-b border-surface-border gap-2 overflow-x-auto">
         <button
           onClick={() => setTab('users')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap ${
             tab === 'users'
               ? 'border-primary-500 text-primary-400 bg-primary-500/5'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -63,7 +114,7 @@ export default function SettingsPage() {
         </button>
         <button
           onClick={() => setTab('tenant')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap ${
             tab === 'tenant'
               ? 'border-primary-500 text-primary-400 bg-primary-500/5'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -73,8 +124,19 @@ export default function SettingsPage() {
           <span>Dados da Loja / Empresa</span>
         </button>
         <button
+          onClick={() => setTab('subscription')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            tab === 'subscription'
+              ? 'border-primary-500 text-primary-400 bg-primary-500/5'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Crown className="w-4 h-4 text-primary-400" />
+          <span>Assinatura & Planos Stripe</span>
+        </button>
+        <button
           onClick={() => setTab('audit')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap ${
             tab === 'audit'
               ? 'border-primary-500 text-primary-400 bg-primary-500/5'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -150,8 +212,132 @@ export default function SettingsPage() {
             </div>
             <div className="p-3 bg-surface-card rounded-xl border border-surface-border">
               <span className="text-zinc-400 font-semibold">Plano SaaS:</span>
-              <p className="text-sm font-bold text-emerald-400 mt-1">{tenant?.plan}</p>
+              <p className="text-sm font-bold text-emerald-400 mt-1">{subscription?.plan?.name || tenant?.plan}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ABA ASSINATURAS STRIPE */}
+      {tab === 'subscription' && (
+        <div className="space-y-6">
+          {/* Card de Assinatura Atual */}
+          <div className="bg-surface border border-surface-border rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider">
+                Assinatura {subscription?.status || 'ATIVA'}
+              </span>
+              <h3 className="text-xl font-black text-white">
+                {subscription?.plan?.name || 'Plano Pro'}
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Renovação automática em:{' '}
+                <strong className="text-zinc-200 font-mono">
+                  {subscription?.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : 'Em 30 dias'}
+                </strong>
+              </p>
+            </div>
+
+            <button
+              onClick={() => stripePortalMutation.mutate()}
+              disabled={stripePortalMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-card hover:bg-surface-border text-zinc-100 font-bold text-xs border border-surface-border transition"
+            >
+              <CreditCard className="w-4 h-4 text-primary-400" />
+              <span>Gerenciar Cartão no Stripe</span>
+              <ExternalLink className="w-3.5 h-3.5 text-zinc-500" />
+            </button>
+          </div>
+
+          {/* Seleção do Ciclo de Cobrança */}
+          <div className="flex justify-center my-4">
+            <div className="bg-surface-card p-1 rounded-xl border border-surface-border flex gap-1">
+              <button
+                onClick={() => setBillingCycle('MONTHLY')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${
+                  billingCycle === 'MONTHLY' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Cobrança Mensal
+              </button>
+              <button
+                onClick={() => setBillingCycle('YEARLY')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  billingCycle === 'YEARLY' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>Cobrança Anual</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black">
+                  Desconto 20%
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Grid de Planos Disponíveis para Upgrade */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {plans?.map((plan: any) => {
+              const isCurrent = subscription?.plan?.slug === plan.slug;
+              const price = billingCycle === 'YEARLY' ? plan.priceYearly : plan.priceMonthly;
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`bg-surface border rounded-2xl p-6 shadow-xl space-y-5 flex flex-col justify-between ${
+                    isCurrent ? 'border-primary-500 shadow-primary-500/10' : 'border-surface-border'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-start">
+                      <h4 className="text-lg font-bold text-white">{plan.name}</h4>
+                      {isCurrent && (
+                        <span className="px-2.5 py-1 rounded-full bg-primary-500/20 text-primary-400 text-[10px] font-bold uppercase border border-primary-500/30">
+                          Plano Atual
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-zinc-400">{plan.description}</p>
+
+                    <div className="py-3 border-y border-surface-border">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-black text-emerald-400 font-mono">
+                          {formatCurrency(price)}
+                        </span>
+                        <span className="text-xs text-zinc-400">/{billingCycle === 'YEARLY' ? 'ano' : 'mês'}</span>
+                      </div>
+                    </div>
+
+                    <ul className="text-xs text-zinc-300 space-y-2">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
+                        <span>Até {plan.maxStores} Lojas</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
+                        <span>Até {plan.maxUsers} Usuários</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-3.5 h-3.5 text-primary-400" />
+                        <span>Até {plan.maxProducts} Produtos Cadastrados</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    disabled={isCurrent || stripeCheckoutMutation.isPending}
+                    onClick={() => stripeCheckoutMutation.mutate(plan.slug)}
+                    className={`w-full py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg ${
+                      isCurrent
+                        ? 'bg-zinc-800 text-zinc-500 cursor-default'
+                        : 'bg-primary-500 hover:bg-primary-400 text-black shadow-primary-500/20'
+                    }`}
+                  >
+                    {isCurrent ? 'Plano Ativo' : 'Assinar via Stripe Checkout'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -175,12 +361,6 @@ export default function SettingsPage() {
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-zinc-500">
                       Carregando logs de auditoria...
-                    </td>
-                  </tr>
-                ) : auditLogs?.data?.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-zinc-500">
-                      Nenhum registro de auditoria.
                     </td>
                   </tr>
                 ) : (

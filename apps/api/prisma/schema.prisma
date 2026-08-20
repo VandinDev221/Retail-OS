@@ -122,18 +122,20 @@ enum BillingCycle {
 }
 
 model Plan {
-  id            String   @id @default(uuid())
-  name          String
-  slug          String   @unique
-  description   String?
-  priceMonthly  Decimal  @map("price_monthly") @db.Decimal(12, 2)
-  priceYearly   Decimal  @map("price_yearly") @db.Decimal(12, 2)
-  maxStores     Int      @default(1) @map("max_stores")
-  maxUsers      Int      @default(5) @map("max_users")
-  maxProducts   Int      @default(1000) @map("max_products")
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid())
+  name                  String
+  slug                  String   @unique
+  description           String?
+  priceMonthly          Decimal  @map("price_monthly") @db.Decimal(12, 2)
+  priceYearly           Decimal  @map("price_yearly") @db.Decimal(12, 2)
+  stripePriceIdMonthly  String?  @map("stripe_price_id_monthly")
+  stripePriceIdYearly   String?  @map("stripe_price_id_yearly")
+  maxStores             Int      @default(1) @map("max_stores")
+  maxUsers              Int      @default(5) @map("max_users")
+  maxProducts           Int      @default(1000) @map("max_products")
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   subscriptions Subscription[]
 
@@ -141,16 +143,18 @@ model Plan {
 }
 
 model Subscription {
-  id                 String             @id @default(uuid())
-  tenantId           String             @unique @map("tenant_id")
-  planId             String             @map("plan_id")
-  billingCycle       BillingCycle       @default(MONTHLY) @map("billing_cycle")
-  status             SubscriptionStatus @default(TRIAL)
-  currentPeriodStart DateTime           @map("current_period_start")
-  currentPeriodEnd   DateTime           @map("current_period_end")
-  autoRenew          Boolean            @default(true) @map("auto_renew")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+  id                   String             @id @default(uuid())
+  tenantId             String             @unique @map("tenant_id")
+  planId               String             @map("plan_id")
+  billingCycle         BillingCycle       @default(MONTHLY) @map("billing_cycle")
+  status               SubscriptionStatus @default(TRIAL)
+  stripeSubscriptionId String?            @map("stripe_subscription_id")
+  stripePriceId        String?            @map("stripe_price_id")
+  currentPeriodStart   DateTime           @map("current_period_start")
+  currentPeriodEnd     DateTime           @map("current_period_end")
+  autoRenew            Boolean            @default(true) @map("auto_renew")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
@@ -162,16 +166,17 @@ model Subscription {
 // TENANTS & STRUCTURE
 // ----------------------------------------------------
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  cnpj      String?
-  phone     String?
-  email     String?
-  plan      String   @default("FREE")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  cnpj             String?
+  phone            String?
+  email            String?
+  stripeCustomerId String?  @map("stripe_customer_id")
+  plan             String   @default("FREE")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   stores             Store[]
   users              User[]

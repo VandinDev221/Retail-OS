@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRoleType, SubscriptionStatus, BillingCycle } from '@prisma/client';
 
@@ -8,6 +9,8 @@ export interface CreatePlanDto {
   description?: string;
   priceMonthly: number;
   priceYearly: number;
+  stripePriceIdMonthly?: string;
+  stripePriceIdYearly?: string;
   maxStores?: number;
   maxUsers?: number;
   maxProducts?: number;
@@ -20,7 +23,10 @@ export interface CheckoutSubscriptionDto {
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
 
   // Listar Planos Ativos
   async getPlans() {
@@ -39,6 +45,8 @@ export class SubscriptionsService {
         description: dto.description,
         priceMonthly: dto.priceMonthly,
         priceYearly: dto.priceYearly,
+        stripePriceIdMonthly: dto.stripePriceIdMonthly,
+        stripePriceIdYearly: dto.stripePriceIdYearly,
         maxStores: dto.maxStores || 1,
         maxUsers: dto.maxUsers || 5,
         maxProducts: dto.maxProducts || 1000,
@@ -49,6 +57,8 @@ export class SubscriptionsService {
         description: dto.description,
         priceMonthly: dto.priceMonthly,
         priceYearly: dto.priceYearly,
+        stripePriceIdMonthly: dto.stripePriceIdMonthly,
+        stripePriceIdYearly: dto.stripePriceIdYearly,
         maxStores: dto.maxStores || 1,
         maxUsers: dto.maxUsers || 5,
         maxProducts: dto.maxProducts || 1000,
@@ -65,11 +75,10 @@ export class SubscriptionsService {
     });
 
     if (!sub) {
-      // Se não possuir assinatura vinculada, vincula ao plano PRO no período de Testes (Trial 14 dias)
       const defaultPlan = await this.prisma.plan.findFirst({ where: { slug: 'pro' } });
       if (defaultPlan) {
         const now = new Date();
-        const end = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 dias
+        const end = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 dias trial
 
         sub = await this.prisma.subscription.create({
           data: {
@@ -88,7 +97,137 @@ export class SubscriptionsService {
     return sub;
   }
 
-  // Trocar / Assinar Plano (Checkout)
+  // --- INTEGRAÇÃO STRIPE CHECKOUT ---
+
+  async createStripeCheckoutSession(tenantId: string, dto: CheckoutSubscriptionDto) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Empresa não encontrada');
+
+    const plan = await this.prisma.plan.findUnique({ where: { slug: dto.planSlug } });
+    if (!plan) throw new NotFoundException('Plano não encontrado');
+
+    const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
+
+    // Se a chave da Stripe estiver configurada no Render/Envs, integra com a SDK da Stripe
+    if (stripeSecretKey && !stripeSecretKey.includes('mock')) {
+      const Stripe = require('stripe');
+      const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+
+      // Obter ou criar Cliente na Stripe
+      let customerId = tenant.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: tenant.email || undefined,
+          name: tenant.name,
+          metadata: { tenantId: tenant.id, tenantSlug: tenant.slug },
+        });
+        customerId = customer.id;
+        await this.prisma.tenant.update({
+          where: { id: tenant.id },
+          data: { stripeCustomerId: customerId },
+        });
+      }
+
+      const priceId =
+        dto.billingCycle === 'YEARLY' ? plan.stripePriceIdYearly : plan.stripePriceIdMonthly;
+
+      // Criar Sessão de Checkout da Stripe
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        line_items: [
+          priceId
+            ? { price: priceId, quantity: 1 }
+            : {
+                price_data: {
+                  currency: 'brl',
+                  product_data: {
+                    name: `Assinatura RetailSyn - ${plan.name}`,
+                    description: plan.description || undefined,
+                  },
+                  unit_amount: Math.round(
+                    Number(dto.billingCycle === 'YEARLY' ? plan.priceYearly : plan.priceMonthly) * 100
+                  ),
+                  recurring: {
+                    interval: dto.billingCycle === 'YEARLY' ? 'year' : 'month',
+                  },
+                },
+                quantity: 1,
+              },
+        ],
+        success_url: `${appUrl}/settings?session_id={CHECKOUT_SESSION_ID}&status=success`,
+        cancel_url: `${appUrl}/settings?status=canceled`,
+        metadata: {
+          tenantId: tenant.id,
+          planSlug: plan.slug,
+          billingCycle: dto.billingCycle,
+        },
+      });
+
+      return { checkoutUrl: session.url };
+    }
+
+    // Modo Simulado (Direct Activation) caso Stripe esteja em homologação sem secret key
+    await this.checkout(tenantId, dto);
+    return { checkoutUrl: `${appUrl}/settings?status=success` };
+  }
+
+  // Criar Portal do Cliente na Stripe (Para alterar cartão ou cancelar assinatura)
+  async createStripeCustomerPortal(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant || !tenant.stripeCustomerId) {
+      throw new BadRequestException('Empresa não possui registro financeiro na Stripe.');
+    }
+
+    const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    const appUrl = this.configService.get<string>('APP_URL') || 'https://retailsyncbr.vercel.app';
+
+    if (stripeSecretKey && !stripeSecretKey.includes('mock')) {
+      const Stripe = require('stripe');
+      const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: tenant.stripeCustomerId,
+        return_url: `${appUrl}/settings`,
+      });
+
+      return { portalUrl: portalSession.url };
+    }
+
+    return { portalUrl: `${appUrl}/settings` };
+  }
+
+  // Webhook Oficial da Stripe para ativação automática de pagamentos
+  async handleStripeWebhook(event: any) {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const tenantId = session.metadata?.tenantId;
+        const planSlug = session.metadata?.planSlug;
+        const billingCycle = session.metadata?.billingCycle || 'MONTHLY';
+
+        if (tenantId && planSlug) {
+          await this.checkout(tenantId, { planSlug, billingCycle });
+        }
+        break;
+      }
+      case 'customer.subscription.deleted': {
+        const subObj = event.data.object;
+        const tenant = await this.prisma.tenant.findFirst({
+          where: { stripeCustomerId: subObj.customer },
+        });
+        if (tenant) {
+          await this.superAdminUpdateTenantStatus(UserRoleType.SUPER_ADMIN, tenant.id, false, SubscriptionStatus.CANCELED);
+        }
+        break;
+      }
+    }
+    return { received: true };
+  }
+
+  // Trocar / Assinar Plano (Direto / Webhook)
   async checkout(tenantId: string, dto: CheckoutSubscriptionDto) {
     const plan = await this.prisma.plan.findUnique({
       where: { slug: dto.planSlug },
@@ -122,10 +261,9 @@ export class SubscriptionsService {
       include: { plan: true },
     });
 
-    // Atualizar slug do plano no tenant
     await this.prisma.tenant.update({
       where: { id: tenantId },
-      data: { plan: plan.slug.toUpperCase() },
+      data: { plan: plan.slug.toUpperCase(), active: true },
     });
 
     return subscription;
@@ -133,7 +271,6 @@ export class SubscriptionsService {
 
   // --- PAINEL SUPER ADMIN PLATAFORMA ---
 
-  // Listar todas as empresas cadastradas no sistema com métricas
   async superAdminListTenants(userRole: UserRoleType) {
     if (userRole !== UserRoleType.SUPER_ADMIN) {
       throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
@@ -163,6 +300,7 @@ export class SubscriptionsService {
       phone: t.phone,
       active: t.active,
       createdAt: t.createdAt,
+      stripeCustomerId: t.stripeCustomerId,
       plan: t.subscription?.plan?.name || t.plan,
       subscriptionStatus: t.subscription?.status || (t.active ? 'ACTIVE' : 'CANCELED'),
       billingCycle: t.subscription?.billingCycle || 'MONTHLY',
@@ -176,7 +314,6 @@ export class SubscriptionsService {
     }));
   }
 
-  // Alterar Status da Assinatura / Bloqueio da Empresa
   async superAdminUpdateTenantStatus(userRole: UserRoleType, tenantId: string, active: boolean, status?: SubscriptionStatus) {
     if (userRole !== UserRoleType.SUPER_ADMIN) {
       throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');
@@ -197,7 +334,6 @@ export class SubscriptionsService {
     return tenant;
   }
 
-  // Logs Globais da Plataforma (Monitoramento de Infraestrutura)
   async superAdminGetSystemLogs(userRole: UserRoleType) {
     if (userRole !== UserRoleType.SUPER_ADMIN) {
       throw new ForbiddenException('Acesso exclusivo para Super Administradores da plataforma.');

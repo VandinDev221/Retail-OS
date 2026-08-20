@@ -5,7 +5,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { UserRoleType, SubscriptionStatus } from '@prisma/client';
 
-@ApiTags('Assinaturas & Planos SaaS')
+@ApiTags('Assinaturas & Stripe SaaS')
 @ApiBearerAuth()
 @Controller('subscriptions')
 export class SubscriptionsController {
@@ -31,9 +31,33 @@ export class SubscriptionsController {
   }
 
   @Post('checkout')
-  @ApiOperation({ summary: 'Assinar / Mudar de Plano (Upgrade)' })
+  @ApiOperation({ summary: 'Assinar / Mudar de Plano (Upgrade Direto)' })
   async checkout(@CurrentUser('tenantId') tenantId: string, @Body() dto: CheckoutSubscriptionDto) {
     return this.subscriptionsService.checkout(tenantId, dto);
+  }
+
+  // --- INTEGRAÇÃO STRIPE ---
+
+  @Post('stripe/create-checkout-session')
+  @ApiOperation({ summary: 'Criar Sessão de Checkout Hospedada no Stripe' })
+  async createStripeCheckoutSession(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CheckoutSubscriptionDto,
+  ) {
+    return this.subscriptionsService.createStripeCheckoutSession(tenantId, dto);
+  }
+
+  @Post('stripe/portal-session')
+  @ApiOperation({ summary: 'Abrir Portal do Cliente Stripe (Gerenciar Cartão / Cancelar)' })
+  async createStripeCustomerPortal(@CurrentUser('tenantId') tenantId: string) {
+    return this.subscriptionsService.createStripeCustomerPortal(tenantId);
+  }
+
+  @Public()
+  @Post('stripe/webhook')
+  @ApiOperation({ summary: 'Webhook Oficial da Stripe para Confirmação de Pagamento' })
+  async handleStripeWebhook(@Body() event: any) {
+    return this.subscriptionsService.handleStripeWebhook(event);
   }
 
   // --- PLATAFORMA SUPER ADMIN ---
