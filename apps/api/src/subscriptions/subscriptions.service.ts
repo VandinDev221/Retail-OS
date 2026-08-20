@@ -113,17 +113,30 @@ export class SubscriptionsService {
             const amount = p.unit_amount ? p.unit_amount / 100 : 0;
 
             if (p.recurring?.interval === 'year') {
-              if (amount > 0) item.priceYearly = amount;
-              item.stripePriceIdYearly = p.id;
+              if (amount > 0 && Math.abs(amount - (item.slug === 'starter' ? 1499.99 : 1999.99)) < 1) {
+                item.priceYearly = amount;
+                item.stripePriceIdYearly = p.id;
+              } else if (!item.stripePriceIdYearly) {
+                item.stripePriceIdYearly = p.id;
+              }
             } else {
-              if (amount > 0) item.priceMonthly = amount;
-              item.stripePriceIdMonthly = p.id;
+              if (amount > 0 && Math.abs(amount - (item.slug === 'starter' ? 159.99 : 249.99)) < 1) {
+                item.priceMonthly = amount;
+                item.stripePriceIdMonthly = p.id;
+              } else if (!item.stripePriceIdMonthly) {
+                item.stripePriceIdMonthly = p.id;
+              }
             }
           });
 
-          const stripeList = Array.from(productsMap.values());
+          // Garantir valores de tabela oficiais estritos
+          const stripeList = Array.from(productsMap.values()).map((item: any) => ({
+            ...item,
+            priceMonthly: item.slug === 'starter' ? 159.99 : 249.99,
+            priceYearly: item.slug === 'starter' ? 1499.99 : 1999.99,
+          }));
+
           if (stripeList.length > 0) {
-            // Ordenar: Starter primeiro, Pro depois
             return stripeList.sort((a: any, b: any) => a.priceMonthly - b.priceMonthly);
           }
         }
