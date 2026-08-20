@@ -2,8 +2,9 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRoleType, SubscriptionStatus, BillingCycle } from '@prisma/client';
-import Stripe from 'stripe';
 import * as bcrypt from 'bcrypt';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const StripeSDK = require('stripe');
 
 export interface CreatePlanDto {
   name: string;
@@ -30,8 +31,8 @@ export class SubscriptionsService {
     private configService: ConfigService,
   ) {}
 
-  private getStripeClient(stripeSecretKey: string): Stripe {
-    const StripeClass = (Stripe as any).default || Stripe;
+  private getStripeClient(stripeSecretKey: string): any {
+    const StripeClass = typeof StripeSDK === 'function' ? StripeSDK : (StripeSDK?.default || StripeSDK);
     return new StripeClass(stripeSecretKey);
   }
 
@@ -226,7 +227,7 @@ export class SubscriptionsService {
                 },
                 unit_amount: dto.billingCycle === 'YEARLY' ? 199000 : 19900,
                 recurring: {
-                  interval: (dto.billingCycle === 'YEARLY' ? 'year' : 'month') as Stripe.Checkout.SessionCreateParams.LineItem.PriceData.Recurring.Interval,
+                  interval: (dto.billingCycle === 'YEARLY' ? 'year' : 'month') as 'year' | 'month',
                 },
               },
               quantity: 1,
