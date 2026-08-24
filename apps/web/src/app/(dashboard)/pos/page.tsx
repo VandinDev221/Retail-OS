@@ -85,6 +85,15 @@ export default function PosPage() {
     },
   });
 
+  // Buscar Dados da Empresa do Cliente Logado (Tenant & Store)
+  const { data: currentUserProfile } = useQuery({
+    queryKey: ['pos-current-user-profile'],
+    queryFn: async () => {
+      const res = await api.get('/auth/me');
+      return res.data;
+    },
+  });
+
   // Manter foco no campo de código de barras
   useEffect(() => {
     if (!showPaymentModal && !showDiscountModal && !showCustomerModal && !showSuccessModal) {
@@ -693,13 +702,24 @@ export default function PosPage() {
 
             {/* DANFE NFC-e TÉRMICO PADRÃO SEFAZ (80mm) */}
             <div className="p-6 bg-white text-black rounded-xl text-left text-[11px] font-mono leading-tight shadow-inner border border-zinc-300 font-bold space-y-3">
-              {/* Cabeçalho da Empresa */}
+              {/* Cabeçalho Dinâmico da Empresa do Cliente */}
               <div className="text-center space-y-0.5 border-b border-black pb-2">
-                <p className="font-black text-sm uppercase tracking-tight">RETAILSYN VAREJO & CONVENIÊNCIA</p>
-                <p className="text-[10px]">RETAILSYN TECNOLOGIA E SISTEMAS LTDA</p>
-                <p className="text-[10px]">CNPJ: 12.345.678/0001-90 · IE: 123.456.789.110</p>
-                <p className="text-[10px]">Av. Brasil, 1500 - São Luís / MA - CEP: 65000-000</p>
-                <p className="text-[10px]">Fone: (98) 98589-4988 · www.retailsyn.com.br</p>
+                <p className="font-black text-sm uppercase tracking-tight">
+                  {currentUserProfile?.tenant?.name || 'EMPRESA DO CLIENTE'}
+                </p>
+                <p className="text-[10px]">
+                  {currentUserProfile?.tenant?.name || 'RAZÃO SOCIAL DO CLIENTE'}
+                </p>
+                <p className="text-[10px]">
+                  CNPJ: {currentUserProfile?.tenant?.cnpj || 'CNPJ NÃO INFORMADO'} · IE: ISENTO
+                </p>
+                <p className="text-[10px]">
+                  {currentUserProfile?.tenant?.stores?.[0]?.address || 'Endereço da Loja Principal'}
+                </p>
+                <p className="text-[10px]">
+                  Fone: {currentUserProfile?.tenant?.phone || currentUserProfile?.tenant?.stores?.[0]?.phone || '(00) 0000-0000'}
+                  {currentUserProfile?.tenant?.email ? ` · ${currentUserProfile.tenant.email}` : ''}
+                </p>
               </div>
 
               {/* Título DANFE */}

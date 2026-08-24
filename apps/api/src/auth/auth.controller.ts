@@ -47,8 +47,8 @@ export class AuthController {
 
   @Get('me')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Obter dados do usuário logado' })
-  async getMe(@CurrentUser() user: any) {
-    return { user };
+  @ApiOperation({ summary: 'Obter dados do usuário logado e empresa/loja' })
+  async getMe(@CurrentUser('id') userId: string) {
+    return this.authService.getMe(userId);
   }
 }
