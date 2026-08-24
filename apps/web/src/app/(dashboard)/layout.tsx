@@ -25,8 +25,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           router.push('/super-admin');
         }
       } else if (user.role === 'CAIXA') {
-        // Caixa: apenas Dashboard (/dashboard), PDV (/pos), Caixa (/cash) e Produtos (/products)
-        const allowedPaths = ['/dashboard', '/pos', '/cash', '/products'];
+        // Caixa: apenas Dashboard (/dashboard), PDV (/pos), Caixa (/cash), Produtos (/products) e Download (/download)
+        const allowedPaths = ['/dashboard', '/pos', '/cash', '/products', '/download'];
         const isAllowed = allowedPaths.some((p) => pathname === p || pathname.startsWith(p));
         if (!isAllowed) {
           router.push('/pos');

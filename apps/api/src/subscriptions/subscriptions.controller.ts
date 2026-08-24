@@ -34,6 +34,12 @@ export class SubscriptionsController {
     return this.subscriptionsService.getMySubscription(tenantId);
   }
 
+  @Get('installer/download')
+  @ApiOperation({ summary: 'Obter link de download do executável (.exe) liberado pós-pagamento' })
+  async getInstallerRelease(@CurrentUser('tenantId') tenantId: string) {
+    return this.subscriptionsService.getInstallerRelease(tenantId);
+  }
+
   @Post('checkout')
   @ApiOperation({ summary: 'Assinar / Mudar de Plano (Upgrade Direto)' })
   async checkout(@CurrentUser('tenantId') tenantId: string, @Body() dto: CheckoutSubscriptionDto) {

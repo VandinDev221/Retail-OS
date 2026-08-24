@@ -210,6 +210,35 @@ export class SubscriptionsService {
     return sub;
   }
 
+  // Obter e validar permissão de download do Instalador Windows (.exe)
+  async getInstallerRelease(tenantId: string) {
+    const subscription = await this.getMySubscription(tenantId);
+
+    const isPaidActive =
+      subscription &&
+      (subscription.status === SubscriptionStatus.ACTIVE ||
+        subscription.status === SubscriptionStatus.TRIAL);
+
+    if (!isPaidActive) {
+      throw new ForbiddenException(
+        'O download do aplicativo instalador (.exe) requer uma assinatura ativa ou período de teste válido. Regularize seu pagamento para liberar o download.',
+      );
+    }
+
+    return {
+      appName: 'RetailSyn PDV Desktop Windows',
+      version: '1.2.0',
+      fileName: 'RetailSyn-PDV-Setup-1.2.0.exe',
+      fileSizeMb: 48,
+      fileUrl: '/downloads/RetailSyn-PDV-Setup-1.2.0.exe',
+      checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      releaseNotes: 'Suporte nativo a balança (Toledo / Filizola), leitor de código de barras USB/Serial e impressora térmica de cupom (ESC/POS).',
+      subscriptionStatus: subscription?.status || 'ACTIVE',
+      downloadAuthorized: true,
+      publishedAt: '2026-08-20',
+    };
+  }
+
   // --- INTEGRAÇÃO STRIPE CHECKOUT & PORTAL ---
 
   async createStripeCheckoutSession(tenantId: string, dto: CheckoutSubscriptionDto) {

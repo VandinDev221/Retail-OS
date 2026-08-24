@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Building,
   Zap,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../../context/auth-context';
 import { cn } from '../../lib/utils';
@@ -35,12 +36,13 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     { label: 'Empresas & Usuários', icon: Building, href: '/super-admin', highlight: true },
   ];
 
-  // Menu do Caixa (Apenas Frente de Caixa, Controle de Caixa e Produtos)
+  // Menu do Caixa (Apenas Frente de Caixa, Controle de Caixa, Produtos e Baixar App)
   const caixaMenuItems = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
     { label: 'Controle de Caixa', icon: Wallet, href: '/cash' },
     { label: 'Produtos & Catálogo', icon: Package, href: '/products' },
+    { label: 'Baixar App Desktop', icon: Download, href: '/download' },
   ];
 
   // Menu Operacional de Loja (Admins e Gerentes)
@@ -54,6 +56,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
     { label: 'Emissão Fiscal (NFe/NFCe)', icon: FileText, href: '/fiscal' },
     { label: 'Financeiro', icon: Receipt, href: '/finance' },
     { label: 'Relatórios & ABC', icon: FileSpreadsheet, href: '/reports' },
+    { label: 'Baixar App Desktop', icon: Download, href: '/download' },
     { label: 'Configurações', icon: Settings, href: '/settings' },
   ];
 
