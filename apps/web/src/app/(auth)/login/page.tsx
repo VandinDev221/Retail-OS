@@ -247,29 +247,27 @@ export default function LoginPage() {
         </div>
 
         {/* Alternar Abas (Entrar vs Criar Conta) */}
-        <div className="flex bg-surface-card p-1 rounded-xl border border-surface-border mb-4">
+        <div className="flex p-1 rounded-xl border mb-4" style={{ backgroundColor: '#181B26', borderColor: '#262B3D' }}>
           <button
             type="button"
             onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition ${
-              mode === 'login' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
-            }`}
+            className="flex-1 py-2.5 text-xs font-bold rounded-lg transition"
+            style={mode === 'login' ? { backgroundColor: '#C29B27', color: '#000000' } : { backgroundColor: 'transparent', color: '#9CA3AF' }}
           >
             Entrar
           </button>
           <button
             type="button"
             onClick={() => { setMode('register'); setError(''); setSuccessMsg(''); }}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition ${
-              mode === 'register' ? 'bg-primary-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
-            }`}
+            className="flex-1 py-2.5 text-xs font-bold rounded-lg transition"
+            style={mode === 'register' ? { backgroundColor: '#C29B27', color: '#000000' } : { backgroundColor: 'transparent', color: '#9CA3AF' }}
           >
             Criar Conta (Cadastrar)
           </button>
         </div>
 
         {/* Card Principal */}
-        <div className="bg-surface border border-surface-border rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <div className="rounded-2xl p-6 sm:p-8 shadow-2xl border" style={{ backgroundColor: '#12141D', borderColor: '#262B3D' }}>
           {error && (
             <div className="mb-6 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -289,10 +287,11 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={googleLoading || loading}
-            className="w-full mb-6 bg-surface-card hover:bg-surface-border border border-surface-border text-zinc-100 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-3 shadow-md disabled:opacity-50"
+            className="w-full mb-6 border font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-3 shadow-md disabled:opacity-50"
+            style={{ backgroundColor: '#181B26', color: '#FFFFFF', borderColor: '#262B3D' }}
           >
             {googleLoading ? (
-              <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-[#C29B27] border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -313,7 +312,7 @@ export default function LoginPage() {
                     d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4.01 3.15c.95-2.85 3.6-4.96 6.72-4.96z"
                   />
                 </svg>
-                <span className="text-sm">
+                <span className="text-sm" style={{ color: '#FFFFFF' }}>
                   {mode === 'login' ? 'Entrar com o Google' : 'Cadastrar com o Google'}
                 </span>
               </>
@@ -322,8 +321,8 @@ export default function LoginPage() {
 
           {/* Divisor Visual */}
           <div className="relative flex items-center justify-center mb-6">
-            <div className="border-t border-surface-border w-full"></div>
-            <span className="bg-surface px-3 text-[11px] text-zinc-500 uppercase tracking-widest font-semibold absolute">
+            <div className="border-t border-[#262B3D] w-full"></div>
+            <span className="px-3 text-[11px] text-zinc-400 uppercase tracking-widest font-semibold absolute" style={{ backgroundColor: '#12141D', color: '#9CA3AF' }}>
               ou com e-mail
             </span>
           </div>
@@ -332,51 +331,54 @@ export default function LoginPage() {
           {mode === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5" style={{ color: '#D1D5DB' }}>
                   Empresa (Código / Slug)
                 </label>
                 <div className="relative">
-                  <Store className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                  <Store className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
                   <input
                     type="text"
                     value={tenantSlug}
                     onChange={(e) => setTenantSlug(e.target.value)}
                     placeholder="Identificador da loja (opcional)"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    className="w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition"
+                    style={{ backgroundColor: '#181B26', color: '#FFFFFF', borderColor: '#262B3D' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5" style={{ color: '#D1D5DB' }}>
                   E-mail
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                  <Mail className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seu.email@empresa.com"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    className="w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition"
+                    style={{ backgroundColor: '#181B26', color: '#FFFFFF', borderColor: '#262B3D' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5" style={{ color: '#D1D5DB' }}>
                   Senha
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                  <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-primary-400 transition"
+                    className="w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition"
+                    style={{ backgroundColor: '#181B26', color: '#FFFFFF', borderColor: '#262B3D' }}
                   />
                 </div>
               </div>
@@ -384,14 +386,15 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || googleLoading}
-                className="w-full mt-2 bg-primary-500 hover:bg-primary-400 text-black font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 disabled:opacity-50"
+                className="w-full mt-2 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                style={{ backgroundColor: '#C29B27', color: '#000000', fontWeight: 'bold' }}
               >
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Entrar</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span style={{ color: '#000000', fontWeight: 'bold' }}>Entrar</span>
+                    <ArrowRight className="w-4 h-4 text-black" />
                   </>
                 )}
               </button>

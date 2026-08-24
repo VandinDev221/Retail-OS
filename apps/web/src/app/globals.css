@@ -13,6 +13,22 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+/* Forçar alto contraste e legibilidade em todas as WebViews/Navegadores */
+input, select, textarea {
+  background-color: #181B26 !important;
+  color: #FFFFFF !important;
+  border-color: #262B3D !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #9CA3AF !important;
+  opacity: 1 !important;
+}
+
+button {
+  font-family: inherit;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
