@@ -1,11 +1,24 @@
 'use client';
 
 import React from 'react';
-import { Bell, Store, Menu } from 'lucide-react';
+import { Bell, Store, Menu, Power } from 'lucide-react';
 import { useAuth } from '../../context/auth-context';
 
 export function Navbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  const handleExitApp = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        if ((window as any).electron?.close) {
+          (window as any).electron.close();
+        } else {
+          window.close();
+        }
+      } catch (e) {}
+      logout();
+    }
+  };
 
   return (
     <header className="h-16 border-b border-surface-border bg-surface/50 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10">
@@ -37,6 +50,16 @@ export function Navbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
 
         <button className="p-2 rounded-lg bg-surface-card border border-surface-border text-zinc-400 hover:text-zinc-100 transition relative">
           <Bell className="w-4 h-4" />
+        </button>
+
+        {/* Botão Sair do App (Fechar Executável) */}
+        <button
+          onClick={handleExitApp}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600 border border-red-600/30 text-red-400 hover:text-white transition font-bold text-xs shadow-md"
+          title="Encerrar Sessão e Fechar o Aplicativo"
+        >
+          <Power className="w-3.5 h-3.5" />
+          <span>Sair do App</span>
         </button>
       </div>
     </header>
