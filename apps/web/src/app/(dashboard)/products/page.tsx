@@ -21,7 +21,12 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Form State
+  // Modal Categoria Manual
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
+
+  // Form State Produto
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [sku, setSku] = useState('');
@@ -53,6 +58,7 @@ export default function ProductsPage() {
     },
   });
 
+  // Mutação para Criar Produto
   const createMutation = useMutation({
     mutationFn: async () => {
       await api.post('/products', {
@@ -78,22 +84,56 @@ export default function ProductsPage() {
     onError: (err: any) => alert(err?.response?.data?.message || 'Erro ao cadastrar produto'),
   });
 
+  // Mutação para Criar Categoria Manual
+  const createCategoryMutation = useMutation({
+    mutationFn: async () => {
+      if (!categoryName.trim()) {
+        throw new Error('Informe o nome da categoria!');
+      }
+      const res = await api.post('/products/categories', {
+        name: categoryName.trim(),
+        description: categoryDescription.trim() || undefined,
+      });
+      return res.data;
+    },
+    onSuccess: (newCat) => {
+      queryClient.invalidateQueries({ queryKey: ['categories-list'] });
+      if (newCat?.id) {
+        setCategoryId(newCat.id);
+      }
+      setShowCategoryModal(false);
+      setCategoryName('');
+      setCategoryDescription('');
+    },
+    onError: (err: any) => alert(err?.response?.data?.message || err?.message || 'Erro ao criar categoria'),
+  });
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Catálogo de Produtos</h1>
-          <p className="text-sm text-zinc-400">Gerenciamento de SKUs, preços, códigos de barras e lotes</p>
+          <p className="text-sm text-zinc-400">Gerenciamento de SKUs, preços, categorias, códigos de barras e lotes</p>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-bold text-sm shadow-lg shadow-primary-500/20 transition"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Cadastrar Produto</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-card hover:bg-surface-border text-zinc-200 font-bold text-sm border border-surface-border transition shadow"
+          >
+            <Layers className="w-4 h-4 text-primary-400" />
+            <span>+ Nova Categoria</span>
+          </button>
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-bold text-sm shadow-lg shadow-primary-500/20 transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Cadastrar Produto</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros e Busca */}
@@ -166,7 +206,11 @@ export default function ProductsPage() {
                         <span>{product.barcode || 'Sem código'}</span>
                       </span>
                     </td>
-                    <td className="p-4 text-zinc-300">{product.category?.name || 'Geral'}</td>
+                    <td className="p-4 text-zinc-300">
+                      <span className="px-2 py-1 rounded bg-surface-card border border-surface-border font-semibold">
+                        {product.category?.name || 'Geral'}
+                      </span>
+                    </td>
                     <td className="p-4 text-right font-mono text-zinc-400">{formatCurrency(product.costPrice)}</td>
                     <td className="p-4 text-right font-mono font-bold text-emerald-400 text-sm">
                       {formatCurrency(product.salePrice)}
@@ -266,7 +310,16 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-zinc-400 font-semibold">Categoria</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-semibold">Categoria</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryModal(true)}
+                      className="text-[11px] text-primary-400 hover:underline font-bold"
+                    >
+                      + Criar Nova
+                    </button>
+                  </div>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
@@ -318,6 +371,59 @@ export default function ProductsPage() {
                 className="px-5 py-2 rounded-xl bg-primary-500 text-black font-bold text-xs hover:bg-primary-400"
               >
                 {createMutation.isPending ? 'Salvando...' : 'Salvar Produto'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CRIAR CATEGORIA MANUAL */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-surface-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-primary-400" />
+              <span>Nova Categoria de Produto</span>
+            </h3>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-zinc-400 font-semibold">Nome da Categoria</label>
+                <input
+                  type="text"
+                  required
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  placeholder="Ex: Bebidas, Conveniência, Mercearia..."
+                  className="w-full mt-1 bg-background border border-surface-border rounded-xl px-3.5 py-2 text-zinc-100 text-sm focus:outline-none focus:border-primary-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-zinc-400 font-semibold">Descrição (Opcional)</label>
+                <input
+                  type="text"
+                  value={categoryDescription}
+                  onChange={(e) => setCategoryDescription(e.target.value)}
+                  placeholder="Ex: Bebidas alcoólicas e não-alcoólicas em geral"
+                  className="w-full mt-1 bg-background border border-surface-border rounded-xl px-3.5 py-2 text-zinc-100 text-sm focus:outline-none focus:border-primary-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowCategoryModal(false)}
+                className="px-4 py-2 rounded-xl bg-surface-card hover:bg-surface-border text-xs text-zinc-300 font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => createCategoryMutation.mutate()}
+                disabled={createCategoryMutation.isPending}
+                className="px-5 py-2 rounded-xl bg-primary-500 text-black font-bold text-xs hover:bg-primary-400"
+              >
+                {createCategoryMutation.isPending ? 'Salvando...' : 'Salvar Categoria'}
               </button>
             </div>
           </div>
