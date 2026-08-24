@@ -192,9 +192,9 @@ export default function DownloadPage() {
               </span>
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
             </div>
-            <h3 className="text-base font-bold text-white">Executar o Instalador no Windows</h3>
+            <h3 className="text-base font-bold text-white">Executar o Instalador & Atalho na Área de Trabalho</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Clique duas vezes no arquivo baixado. Se o filtro do Windows Defender (SmartScreen) exibir um aviso de proteção, clique em <strong>"Mais informações"</strong> e depois em <strong>"Executar assim mesmo"</strong> para concluir a instalação automática.
+              Clique duas vezes no arquivo baixado para concluir a instalação. Um <strong>atalho oficial "RetailSyn PDV"</strong> será gerado automaticamente na sua <strong>Área de Trabalho (Desktop)</strong> para acesso rápido com um clique.
             </p>
           </div>
 
