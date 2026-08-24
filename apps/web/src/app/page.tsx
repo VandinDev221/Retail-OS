@@ -23,10 +23,30 @@ import {
   BarChart3,
   Check,
 } from 'lucide-react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../context/auth-context';
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isElectron = navigator.userAgent.toLowerCase().includes('electron') || (window as any).electron;
+      if (isElectron) {
+        if (!loading && user) {
+          if (user.role === 'SUPER_ADMIN') router.push('/super-admin');
+          else if (user.role === 'CAIXA') router.push('/pos');
+          else router.push('/dashboard');
+        } else if (!loading && !user) {
+          router.push('/login');
+        }
+      }
+    }
+  }, [user, loading, router]);
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);

@@ -51,7 +51,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background text-primary-400">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs font-mono tracking-widest uppercase text-zinc-400">Redirecionando para o login...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (user.role === 'SUPER_ADMIN' && !pathname.startsWith('/super-admin')) {
     return (
