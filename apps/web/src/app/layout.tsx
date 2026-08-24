@@ -11,12 +11,17 @@ export const metadata: Metadata = {
   description: 'Sistema de Gestão para Loja de Conveniência, Mercado, Adega e Varejo',
 };
 
+import { DesktopTitlebar } from '../components/layout/desktop-titlebar';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
       <body className="font-sans bg-background text-zinc-100 antialiased selection:bg-primary-500 selection:text-black min-h-screen">
         <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <DesktopTitlebar />
+            {children}
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>
