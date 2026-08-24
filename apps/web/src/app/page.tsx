@@ -38,15 +38,15 @@ export default function LandingPage() {
       const isElectron = navigator.userAgent.toLowerCase().includes('electron') || (window as any).electron;
       if (isElectron) {
         if (!loading && user) {
-          if (user.role === 'SUPER_ADMIN') router.push('/super-admin');
-          else if (user.role === 'CAIXA') router.push('/pos');
-          else router.push('/dashboard');
+          if (user.role === 'SUPER_ADMIN') window.location.href = '/super-admin';
+          else if (user.role === 'CAIXA') window.location.href = '/pos';
+          else window.location.href = '/dashboard';
         } else if (!loading && !user) {
-          router.push('/login');
+          window.location.href = '/login';
         }
       }
     }
-  }, [user, loading, router]);
+  }, [user, loading]);
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
