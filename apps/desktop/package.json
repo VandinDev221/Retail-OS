@@ -1,0 +1,21 @@
+{
+  "name": "@retail-os/desktop",
+  "version": "1.2.0",
+  "description": "RetailSyn PDV Desktop Application (Electron Native Shell)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:exe": "electron-builder --win nsis"
+  },
+  "keywords": [
+    "retailsyn",
+    "pdv",
+    "electron",
+    "desktop"
+  ],
+  "author": "RetailSyn",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.3.3"
+  }
+}
