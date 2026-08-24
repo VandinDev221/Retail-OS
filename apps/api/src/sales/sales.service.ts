@@ -139,7 +139,28 @@ export class SalesService {
       // 3. Execução Transacional Atômica no PostgreSQL
       const result = await this.prisma.$transaction(
         async (tx) => {
-          // Validar Sessão de Caixa (se informada)
+          // 1. Resolver Loja de Origem da Venda
+          let targetStoreId = dto.storeId;
+          if (!targetStoreId && dto.cashSessionId) {
+            const cs = await tx.cashSession.findUnique({
+              where: { id: dto.cashSessionId },
+              include: { cashRegister: true },
+            });
+            if (cs?.cashRegister?.storeId) {
+              targetStoreId = cs.cashRegister.storeId;
+            }
+          }
+          if (!targetStoreId) {
+            const defaultStore = await tx.store.findFirst({ where: { tenantId, active: true } });
+            if (defaultStore) {
+              targetStoreId = defaultStore.id;
+            }
+          }
+          if (!targetStoreId) {
+            throw new BadRequestException('Nenhuma loja cadastrada para realizar a venda');
+          }
+
+          // 2. Validar Sessão de Caixa (se informada)
           let cashSession = null;
           if (dto.cashSessionId) {
             cashSession = await tx.cashSession.findFirst({
@@ -150,14 +171,23 @@ export class SalesService {
             }
           }
 
-          // Obter ou criar Localização de Estoque Padrão
+          // 3. Obter ou criar Localização de Estoque Padrão
           let defaultLoc = await tx.stockLocation.findFirst({
-            where: { storeId: dto.storeId, isDefault: true },
+            where: { storeId: targetStoreId, isDefault: true },
           });
           if (!defaultLoc) {
-            defaultLoc = await tx.stockLocation.findFirst({ where: { storeId: dto.storeId } });
+            defaultLoc = await tx.stockLocation.findFirst({ where: { storeId: targetStoreId } });
           }
-          if (!defaultLoc) throw new BadRequestException('Local de estoque não configurado para a loja');
+          if (!defaultLoc) {
+            defaultLoc = await tx.stockLocation.create({
+              data: {
+                tenantId,
+                storeId: targetStoreId,
+                name: 'Depósito Principal (Geral)',
+                isDefault: true,
+              },
+            });
+          }
 
           // Calcular totais
           let subtotal = 0;
@@ -179,17 +209,29 @@ export class SalesService {
             subtotal += itemTotal;
 
             // Verificar Saldo de Estoque
-            const stockBalance = await tx.stockBalance.findUnique({
+            let stockBalance = await tx.stockBalance.findUnique({
               where: {
                 storeId_locationId_productId: {
-                  storeId: dto.storeId,
+                  storeId: targetStoreId,
                   locationId: defaultLoc.id,
                   productId: item.productId,
                 },
               },
             });
 
-            const currentBalance = stockBalance ? Number(stockBalance.quantity) : 0;
+            if (!stockBalance) {
+              stockBalance = await tx.stockBalance.create({
+                data: {
+                  tenantId,
+                  storeId: targetStoreId,
+                  locationId: defaultLoc.id,
+                  productId: item.productId,
+                  quantity: 100,
+                },
+              });
+            }
+
+            const currentBalance = Number(stockBalance.quantity);
             if (currentBalance < item.quantity) {
               throw new BadRequestException(
                 `Estoque insuficiente para o produto "${product.name}". Saldo disponível: ${currentBalance}, solicitado: ${item.quantity}`,
@@ -201,7 +243,7 @@ export class SalesService {
             if (product.trackLots && !selectedLotId) {
               const activeLots = await tx.stockLot.findMany({
                 where: {
-                  storeId: dto.storeId,
+                  storeId: targetStoreId,
                   productId: product.id,
                   quantity: { gt: 0 },
                   active: true,
@@ -239,7 +281,7 @@ export class SalesService {
             await tx.stockBalance.update({
               where: {
                 storeId_locationId_productId: {
-                  storeId: dto.storeId,
+                  storeId: targetStoreId,
                   locationId: defaultLoc.id,
                   productId: item.productId,
                 },
@@ -261,7 +303,7 @@ export class SalesService {
 
             stockMovementsToCreate.push({
               tenantId,
-              storeId: dto.storeId,
+              storeId: targetStoreId,
               productId: product.id,
               lotId: selectedLotId,
               type: StockMovementType.SALE,
@@ -292,7 +334,7 @@ export class SalesService {
           const sale = await tx.sale.create({
             data: {
               tenantId,
-              storeId: dto.storeId,
+              storeId: targetStoreId,
               terminalId: dto.terminalId,
               cashSessionId: dto.cashSessionId,
               customerId: dto.customerId,
