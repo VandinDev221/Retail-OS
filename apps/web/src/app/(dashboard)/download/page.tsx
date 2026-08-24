@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import {
@@ -38,6 +38,27 @@ export default function DownloadPage() {
   });
 
   const isBlocked = isError || !releaseInfo?.downloadAuthorized;
+
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadFile = () => {
+    if (isBlocked) return;
+    setDownloading(true);
+
+    try {
+      const fileUrl = releaseInfo?.fileUrl || '/downloads/RetailSyn-PDV-Setup-1.2.0.exe';
+      const a = document.createElement('a');
+      a.href = fileUrl;
+      a.download = 'RetailSyn-PDV-Setup-1.2.0.exe';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Erro ao acionar download:', err);
+    } finally {
+      setTimeout(() => setDownloading(false), 2000);
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -105,14 +126,14 @@ export default function DownloadPage() {
 
           <div className="w-full md:w-auto flex flex-col items-center gap-3">
             {!isBlocked ? (
-              <a
-                href={releaseInfo?.fileUrl || '#'}
-                download="RetailSyn-PDV-Setup-1.2.0.exe"
-                className="w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-primary-500 hover:bg-primary-400 text-black font-extrabold text-sm shadow-xl shadow-primary-500/20 transition transform hover:-translate-y-0.5"
+              <button
+                onClick={handleDownloadFile}
+                disabled={downloading}
+                className="w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-primary-500 hover:bg-primary-400 text-black font-extrabold text-sm shadow-xl shadow-primary-500/20 transition transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <Download className="w-5 h-5" />
-                <span>Baixar Instalador Windows (.exe)</span>
-              </a>
+                <span>{downloading ? 'Iniciando Download...' : 'Baixar Instalador Windows (.exe)'}</span>
+              </button>
             ) : (
               <div className="w-full md:w-auto text-center space-y-3">
                 <button
