@@ -86,7 +86,7 @@ export default function LoginPage() {
               } else if (res?.user?.role === 'CAIXA') {
                 router.push('/pos');
               } else {
-                router.push('/');
+                router.push('/dashboard');
               }
             } else {
               setError('Não foi possível obter o e-mail da conta Google.');
@@ -132,7 +132,7 @@ export default function LoginPage() {
       } else if (loggedUser?.role === 'CAIXA') {
         router.push('/pos');
       } else {
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'E-mail ou senha incorretos.');
@@ -162,7 +162,7 @@ export default function LoginPage() {
       } else if (res?.user?.role === 'SUPER_ADMIN') {
         router.push('/super-admin');
       } else {
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Erro ao cadastrar empresa.');
