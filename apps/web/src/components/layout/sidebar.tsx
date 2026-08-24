@@ -37,7 +37,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
 
   // Menu do Caixa (Apenas Frente de Caixa, Controle de Caixa e Produtos)
   const caixaMenuItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
+    { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
     { label: 'Controle de Caixa', icon: Wallet, href: '/cash' },
     { label: 'Produtos & Catálogo', icon: Package, href: '/products' },
@@ -45,7 +45,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen?: boolean; s
 
   // Menu Operacional de Loja (Admins e Gerentes)
   const storeMenuItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
+    { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { label: 'Frente de Caixa (PDV)', icon: ShoppingCart, href: '/pos', highlight: true },
     { label: 'Controle de Caixa', icon: Wallet, href: '/cash' },
     { label: 'Produtos & Catálogo', icon: Package, href: '/products' },

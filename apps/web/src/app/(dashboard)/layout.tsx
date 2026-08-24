@@ -25,16 +25,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           router.push('/super-admin');
         }
       } else if (user.role === 'CAIXA') {
-        // Caixa: apenas Dashboard (/), PDV (/pos), Caixa (/cash) e Produtos (/products)
-        const allowedPaths = ['/', '/pos', '/cash', '/products'];
-        const isAllowed = allowedPaths.some((p) => pathname === p || (p !== '/' && pathname.startsWith(p)));
+        // Caixa: apenas Dashboard (/dashboard), PDV (/pos), Caixa (/cash) e Produtos (/products)
+        const allowedPaths = ['/dashboard', '/pos', '/cash', '/products'];
+        const isAllowed = allowedPaths.some((p) => pathname === p || pathname.startsWith(p));
         if (!isAllowed) {
           router.push('/pos');
         }
       } else {
         // Não-SuperAdmin tentando acessar rota do super admin
         if (pathname.startsWith('/super-admin')) {
-          router.push('/');
+          router.push('/dashboard');
         }
       }
     }
