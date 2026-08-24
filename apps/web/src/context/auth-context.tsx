@@ -34,18 +34,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('retail_os_token');
-    const savedUser = localStorage.getItem('retail_os_user');
+    try {
+      const savedToken = localStorage.getItem('retail_os_token');
+      const savedUser = localStorage.getItem('retail_os_user');
 
-    if (savedToken && savedUser) {
-      try {
+      if (savedToken && savedUser) {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
-      } catch (e) {
+      }
+    } catch (e) {
+      if (typeof window !== 'undefined') {
         localStorage.clear();
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (data: { email: string; password: string; tenantSlug?: string }): Promise<UserProfile> => {

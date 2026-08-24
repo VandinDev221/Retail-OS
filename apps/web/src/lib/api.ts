@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-let rawBaseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+let rawBaseURL = process.env.NEXT_PUBLIC_API_URL || 'https://retail-os-z4r4.onrender.com/api/v1';
 if (rawBaseURL.endsWith('/')) {
   rawBaseURL = rawBaseURL.slice(0, -1);
 }
