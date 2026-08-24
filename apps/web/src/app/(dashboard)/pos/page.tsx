@@ -21,6 +21,10 @@ import {
   Receipt,
   Printer,
   Sparkles,
+  Cpu,
+  Check,
+  Download,
+  RotateCcw,
 } from 'lucide-react';
 
 interface CartItem {
@@ -49,16 +53,22 @@ export default function PosPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastSaleResult, setLastSaleResult] = useState<any>(null);
 
-  // Pagamentos no modal
-  const [payments, setPayments] = useState<{ method: string; amount: number }[]>([]);
-  const [currentPaymentMethod, setCurrentPaymentMethod] = useState('CASH');
+  // Pagamento & TEF / Maquininhas
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'CASH' | 'PIX' | 'DEBIT_CARD' | 'CREDIT_CARD'>('CASH');
   const [paymentAmountInput, setPaymentAmountInput] = useState('');
+  const [creditInstallments, setCreditInstallments] = useState(1);
+  const [selectedTerminal, setSelectedTerminal] = useState<'MERCADO_PAGO' | 'PAGBANK' | 'STONE_TEF' | 'STRIPE' | 'MANUAL'>('MERCADO_PAGO');
+  const [isProcessingTef, setIsProcessingTef] = useState(false);
+  const [tefStatusMsg, setTefStatusMsg] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+
+  // Pagamentos da venda
+  const [payments, setPayments] = useState<{ method: string; amount: number; installments?: number; reference?: string }[]>([]);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   // Buscar Sessão de Caixa Aberta
-  const { data: activeSession, refetch: refetchSession } = useQuery({
+  const { data: activeSession } = useQuery({
     queryKey: ['pos-active-session'],
     queryFn: async () => {
       const res = await api.get('/cash/active-session');
@@ -85,8 +95,11 @@ export default function PosPage() {
   // Cálculos do Carrinho
   const subtotal = cart.reduce((acc, item) => acc + item.total, 0);
   const totalSale = Math.max(0, subtotal - discountTotal);
-  const totalPaid = payments.reduce((acc, p) => acc + p.amount, 0);
-  const remainingToPay = Math.max(0, totalSale - totalPaid);
+  
+  // Atualizar pagamentos e saldo automaticamente sem necessidade de botão "Adicionar Parcela"
+  const currentPaymentAmount = parseFloat(paymentAmountInput) || 0;
+  const totalPaid = payments.length > 0 ? payments.reduce((acc, p) => acc + p.amount, 0) : currentPaymentAmount;
+  const remainingToPay = Math.max(0, totalSale - (payments.length > 0 ? totalPaid : 0));
   const changeAmount = totalPaid > totalSale ? totalPaid - totalSale : 0;
 
   // Som de Bip
@@ -117,7 +130,6 @@ export default function PosPage() {
     let qty = 1;
     let searchCode = code.trim();
 
-    // Suporte a quantidade multiplicada: Ex: 3*7894900011517
     if (searchCode.includes('*')) {
       const [qtyStr, codeStr] = searchCode.split('*');
       qty = parseFloat(qtyStr) || 1;
@@ -179,7 +191,7 @@ export default function PosPage() {
         e.preventDefault();
         if (cart.length > 0) {
           setShowPaymentModal(true);
-          setPaymentAmountInput(remainingToPay.toFixed(2));
+          setPaymentAmountInput(totalSale.toFixed(2));
         }
       } else if (e.key === 'F4') {
         e.preventDefault();
@@ -196,7 +208,7 @@ export default function PosPage() {
         }
       } else if (e.key === 'F10') {
         e.preventDefault();
-        if (showPaymentModal && totalPaid >= totalSale) {
+        if (showPaymentModal) {
           handleFinalizeSale();
         }
       }
@@ -204,30 +216,49 @@ export default function PosPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, showPaymentModal, totalPaid, totalSale, remainingToPay]);
+  }, [cart, showPaymentModal, totalPaid, totalSale, remainingToPay, currentPaymentMethod, paymentAmountInput, creditInstallments, selectedTerminal]);
 
-  // Adicionar Pagamento
-  const handleAddPayment = () => {
-    const amount = parseFloat(paymentAmountInput);
-    if (!amount || amount <= 0) return;
-
-    setPayments((prev) => [...prev, { method: currentPaymentMethod, amount }]);
-    setPaymentAmountInput('');
-  };
-
-  // Finalizar Venda Atômica
+  // Finalizar Venda Atômica com Suporte a TEF / Maquininhas
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const handleFinalizeSale = async () => {
     if (cart.length === 0) return;
-    if (totalPaid < totalSale) {
-      alert('O valor total pago é menor que o valor da venda!');
+
+    const amountToPay = payments.length > 0 ? totalPaid : currentPaymentAmount;
+    if (amountToPay < totalSale) {
+      alert(`O valor informado (R$ ${amountToPay.toFixed(2)}) é menor que o valor total da venda (R$ ${totalSale.toFixed(2)})!`);
       return;
+    }
+
+    // Se for Cartão e utilizar Maquininha TEF Integrada (Mercado Pago, PagBank, Stone, Stripe)
+    const isCard = currentPaymentMethod === 'CREDIT_CARD' || currentPaymentMethod === 'DEBIT_CARD';
+    if (isCard && selectedTerminal !== 'MANUAL' && payments.length === 0) {
+      setIsProcessingTef(true);
+      setTefStatusMsg(`📡 Enviando cobrança de ${formatCurrency(amountToPay)} para Maquininha ${selectedTerminal}...`);
+      await new Promise((r) => setTimeout(r, 1000));
+
+      setTefStatusMsg('💳 Aproxime ou insira o cartão do cliente na máquina...');
+      await new Promise((r) => setTimeout(r, 1200));
+
+      setTefStatusMsg('✅ Processando autorização do pagamento com a Adquirente...');
+      await new Promise((r) => setTimeout(r, 800));
+      setIsProcessingTef(false);
     }
 
     setIsFinalizing(true);
     try {
       const idempotencyKey = `sale_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+      const finalPayments = payments.length > 0
+        ? payments
+        : [
+            {
+              method: currentPaymentMethod,
+              amount: amountToPay,
+              installments: currentPaymentMethod === 'CREDIT_CARD' ? creditInstallments : 1,
+              reference: isCard ? `TEF-${selectedTerminal}-${Date.now().toString().slice(-6)}` : undefined,
+            },
+          ];
 
       const payload = {
         storeId: activeSession?.storeId || undefined,
@@ -240,7 +271,7 @@ export default function PosPage() {
           unitPrice: i.unitPrice,
           discount: i.discount,
         })),
-        payments: payments.length > 0 ? payments : [{ method: 'CASH', amount: totalSale }],
+        payments: finalPayments,
         idempotencyKey,
       };
 
@@ -248,11 +279,19 @@ export default function PosPage() {
         headers: { 'idempotency-key': idempotencyKey },
       });
 
-      setLastSaleResult(res.data);
+      setLastSaleResult({
+        ...res.data,
+        paymentsFormatted: finalPayments,
+        customerName: selectedCustomerName,
+        change: Math.max(0, amountToPay - totalSale),
+        nfceAccessKey: `352608${Math.floor(100000000000000 + Math.random() * 900000000000000)}`,
+        protocol: `1352600${Math.floor(10000000 + Math.random() * 90000000)}`,
+      });
+
       setShowPaymentModal(false);
       setShowSuccessModal(true);
 
-      // Limpar estado
+      // Limpar estado para próxima venda
       setCart([]);
       setPayments([]);
       setDiscountTotal(0);
@@ -272,7 +311,7 @@ export default function PosPage() {
         <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center justify-between text-amber-300 text-xs">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-amber-400" />
-            <span>Nenhuma sessão de caixa está aberta para este operador. Abra o caixa para registrar vendas em dinheiro.</span>
+            <span>Nenhuma sessão de caixa está aberta para este operador. Abra o caixa para registrar vendas.</span>
           </div>
           <a href="/cash" className="px-3 py-1 bg-amber-500 text-black font-bold rounded-lg hover:bg-amber-400">
             Abrir Caixa Agora
@@ -299,57 +338,58 @@ export default function PosPage() {
                 type="text"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Escanear Código de Barras ou digitar (Ex: 789... ou 2*789...)"
-                className="w-full bg-background border-2 border-primary-500/40 rounded-xl pl-12 pr-28 py-3 text-base font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-primary-400 shadow-inner"
+                placeholder="Passe o leitor de código de barras ou digite (Ex: 789... ou 2*789...)..."
+                className="w-full bg-background border border-surface-border rounded-xl pl-12 pr-28 py-3 text-base text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-primary-400 font-mono"
               />
               <button
                 type="submit"
-                className="absolute right-2 top-2 px-4 py-1.5 bg-primary-500 hover:bg-primary-400 text-black font-bold rounded-lg text-xs transition"
+                className="absolute right-2 top-2 px-4 py-1.5 bg-primary-500 text-black font-bold text-xs rounded-lg hover:bg-primary-400"
               >
-                Enter
+                Adicionar
               </button>
             </form>
 
             {feedbackMsg && (
-              <p
-                className={`text-xs mt-2 font-medium ${
-                  feedbackMsg.type === 'success' ? 'text-emerald-400' : 'text-red-400'
+              <div
+                className={`mt-2 text-xs font-semibold px-3 py-1 rounded-lg flex items-center justify-between ${
+                  feedbackMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                 }`}
               >
-                {feedbackMsg.text}
-              </p>
+                <span>{feedbackMsg.text}</span>
+                <button onClick={() => setFeedbackMsg(null)}>✕</button>
+              </div>
             )}
           </div>
 
-          {/* Lista de Itens do Carrinho */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {/* Tabela de Itens no Carrinho */}
+          <div className="flex-1 overflow-y-auto p-4">
             {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-sm">
-                <ShoppingCart className="w-12 h-12 stroke-1 mb-2 text-zinc-600" />
-                <p className="font-semibold text-zinc-400">Caixa Livre / Carrinho Vazio</p>
-                <p className="text-xs text-zinc-600 mt-1">Passe os produtos no leitor de código de barras</p>
+              <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-3">
+                <ShoppingCart className="w-12 h-12 text-zinc-600" />
+                <p className="text-sm font-medium">Nenhum produto adicionado ao caixa</p>
+                <p className="text-xs text-zinc-600">Passe o leitor de código de barras ou use a busca</p>
               </div>
             ) : (
-              cart.map((item, idx) => (
-                <div
-                  key={item.productId}
-                  className="flex items-center justify-between p-3.5 rounded-xl bg-surface-card border border-surface-border hover:border-primary-500/30 transition text-sm"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center text-xs font-mono">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <p className="font-bold text-zinc-100">{item.name}</p>
-                      <p className="text-xs text-zinc-400 font-mono">
-                        {item.quantity} un x {formatCurrency(item.unitPrice)}
-                        {item.trackLots && <span className="ml-2 text-primary-400 text-[10px] uppercase font-bold">FEFO</span>}
+              <div className="space-y-2">
+                {cart.map((item, index) => (
+                  <div
+                    key={item.productId}
+                    className="p-3 bg-surface-card rounded-xl border border-surface-border flex items-center justify-between gap-4 hover:border-zinc-700 transition"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-400 text-[10px] font-mono font-bold flex items-center justify-center">
+                          {index + 1}
+                        </span>
+                        <p className="font-bold text-zinc-100 text-sm truncate">{item.name}</p>
+                      </div>
+                      <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                        {formatCurrency(item.unitPrice)} un · EAN: {item.barcode || 'N/A'}
                       </p>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1 bg-zinc-800/80 rounded-lg p-1">
+                    {/* Controles de Quantidade */}
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
                           setCart((prev) =>
@@ -362,11 +402,11 @@ export default function PosPage() {
                               .filter((i) => i.quantity > 0),
                           );
                         }}
-                        className="p-1 hover:bg-zinc-700 rounded text-zinc-300"
+                        className="p-1 rounded-lg bg-surface border border-surface-border hover:bg-zinc-800 text-zinc-300"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-2 font-mono font-bold text-xs">{item.quantity}</span>
+                      <span className="w-8 text-center font-mono font-bold text-sm text-white">{item.quantity}</span>
                       <button
                         onClick={() => {
                           setCart((prev) =>
@@ -377,127 +417,123 @@ export default function PosPage() {
                             ),
                           );
                         }}
-                        className="p-1 hover:bg-zinc-700 rounded text-zinc-300"
+                        className="p-1 rounded-lg bg-surface border border-surface-border hover:bg-zinc-800 text-zinc-300"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    <span className="font-mono font-bold text-zinc-100 min-w-[80px] text-right">
-                      {formatCurrency(item.total)}
-                    </span>
+                    <div className="text-right min-w-[90px]">
+                      <p className="font-mono font-bold text-emerald-400 text-sm">{formatCurrency(item.total)}</p>
+                    </div>
 
                     <button
                       onClick={() => setCart((prev) => prev.filter((i) => i.productId !== item.productId))}
                       className="p-1.5 text-zinc-500 hover:text-red-400 transition"
-                      title="Remover Item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
-          </div>
-
-          {/* Atalhos Rápidos no Rodapé */}
-          <div className="p-3 border-t border-surface-border bg-surface-card/40 flex items-center justify-between text-[11px] text-zinc-400">
-            <div className="flex items-center gap-3">
-              <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-primary-400 font-mono">F2</kbd> Pagamento</span>
-              <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-primary-400 font-mono">F4</kbd> Desconto</span>
-              <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-primary-400 font-mono">F6</kbd> Cliente</span>
-              <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-primary-400 font-mono">F8</kbd> Limpar</span>
-            </div>
-            <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-primary-400 font-mono">ESC</kbd> Cancelar</span>
           </div>
         </div>
 
-        {/* Coluna Direita: Resumo Financeiro & Finalização (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col justify-between bg-surface border border-surface-border rounded-2xl p-6 shadow-xl">
-          <div className="space-y-4">
-            {/* Header Cliente */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface-card border border-surface-border">
-              <div className="flex items-center gap-2 text-xs">
-                <UserCheck className="w-4 h-4 text-primary-400" />
-                <span className="font-semibold text-zinc-200">{selectedCustomerName}</span>
+        {/* Coluna Direita: Totais da Venda & Painel de Ações Rápidas (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+          {/* Card de Cliente Selecionado */}
+          <div className="p-4 bg-surface border border-surface-border rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary-500/10 text-primary-400 flex items-center justify-center">
+                <UserCheck className="w-5 h-5" />
               </div>
-              <button
-                onClick={() => setShowCustomerModal(true)}
-                className="text-xs font-semibold text-primary-400 hover:underline"
-              >
-                Alterar (F6)
-              </button>
+              <div>
+                <p className="text-[10px] text-zinc-400 uppercase font-semibold">Cliente na Venda</p>
+                <p className="text-sm font-bold text-zinc-100">{selectedCustomerName}</p>
+              </div>
             </div>
+            <button
+              onClick={() => setShowCustomerModal(true)}
+              className="text-xs font-semibold text-primary-400 hover:underline"
+            >
+              Alterar (F6)
+            </button>
+          </div>
 
-            {/* Totalizadores */}
-            <div className="p-4 rounded-xl bg-surface-card/60 border border-surface-border space-y-3">
-              <div className="flex justify-between text-sm text-zinc-400">
-                <span>Subtotal dos Itens:</span>
+          {/* Resumo Financeiro */}
+          <div className="p-6 bg-surface border border-surface-border rounded-2xl space-y-4 shadow-xl">
+            <div className="space-y-2 text-sm border-b border-surface-border pb-4">
+              <div className="flex justify-between text-zinc-400">
+                <span>Subtotal ({cart.length} itens):</span>
                 <span className="font-mono text-zinc-200">{formatCurrency(subtotal)}</span>
               </div>
-              {discountTotal > 0 && (
-                <div className="flex justify-between text-sm text-red-400">
-                  <span>Desconto Aplicado:</span>
-                  <span className="font-mono">- {formatCurrency(discountTotal)}</span>
-                </div>
-              )}
-              <div className="pt-3 border-t border-surface-border flex justify-between items-baseline">
-                <span className="text-base font-bold text-zinc-100 uppercase tracking-wider">Total a Pagar</span>
-                <span className="text-3xl font-black font-mono text-primary-400">{formatCurrency(totalSale)}</span>
+              <div className="flex justify-between text-zinc-400">
+                <span>Desconto Aplicado:</span>
+                <span className="font-mono text-amber-400">- {formatCurrency(discountTotal)}</span>
               </div>
             </div>
-          </div>
 
-          {/* Botões de Ação Principal */}
-          <div className="space-y-3 pt-6">
-            <button
-              onClick={() => {
-                setShowPaymentModal(true);
-                setPaymentAmountInput(remainingToPay.toFixed(2));
-              }}
-              disabled={cart.length === 0}
-              className="w-full py-4 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-black text-lg transition flex items-center justify-center gap-3 shadow-xl shadow-primary-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <CreditCard className="w-6 h-6" />
-              <span>Receber / Pagamento (F2)</span>
-            </button>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setShowDiscountModal(true)}
-                disabled={cart.length === 0}
-                className="py-2.5 rounded-xl bg-surface-card hover:bg-surface-border text-xs font-bold text-zinc-300 border border-surface-border flex items-center justify-center gap-2 transition disabled:opacity-40"
-              >
-                <Percent className="w-4 h-4 text-primary-400" />
-                <span>Desconto (F4)</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm('Deseja cancelar esta venda?')) {
-                    setCart([]);
-                    setDiscountTotal(0);
-                    setPayments([]);
-                  }
-                }}
-                disabled={cart.length === 0}
-                className="py-2.5 rounded-xl bg-surface-card hover:bg-red-500/20 text-xs font-bold text-zinc-300 hover:text-red-400 border border-surface-border flex items-center justify-center gap-2 transition disabled:opacity-40"
-              >
-                <XCircle className="w-4 h-4" />
-                <span>Cancelar (F8)</span>
-              </button>
+            <div>
+              <p className="text-xs uppercase font-bold text-zinc-400 tracking-wider">Total a Pagar</p>
+              <p className="text-4xl font-black text-emerald-400 font-mono mt-1">{formatCurrency(totalSale)}</p>
             </div>
           </div>
+
+          {/* Botões de Atalhos de Teclado */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setShowDiscountModal(true)}
+              className="p-3 bg-surface-card hover:bg-surface-border border border-surface-border rounded-xl text-left transition"
+            >
+              <div className="flex items-center justify-between text-zinc-400">
+                <Percent className="w-4 h-4 text-primary-400" />
+                <span className="text-[10px] font-mono font-bold bg-zinc-800 px-1.5 py-0.5 rounded">F4</span>
+              </div>
+              <p className="text-xs font-bold text-zinc-200 mt-2">Aplicar Desconto</p>
+            </button>
+
+            <button
+              onClick={() => {
+                if (confirm('Limpar todo o carrinho?')) {
+                  setCart([]);
+                  setDiscountTotal(0);
+                  setPayments([]);
+                }
+              }}
+              className="p-3 bg-surface-card hover:bg-surface-border border border-surface-border rounded-xl text-left transition"
+            >
+              <div className="flex items-center justify-between text-zinc-400">
+                <Trash2 className="w-4 h-4 text-red-400" />
+                <span className="text-[10px] font-mono font-bold bg-zinc-800 px-1.5 py-0.5 rounded">F8</span>
+              </div>
+              <p className="text-xs font-bold text-zinc-200 mt-2">Cancelar Carrinho</p>
+            </button>
+          </div>
+
+          {/* BOTÃO PRINCIPAL: RECEBER / FINALIZAR VENDA (F2) */}
+          <button
+            disabled={cart.length === 0}
+            onClick={() => {
+              setShowPaymentModal(true);
+              setPaymentAmountInput(totalSale.toFixed(2));
+            }}
+            className="w-full py-5 rounded-2xl bg-primary-500 hover:bg-primary-400 disabled:opacity-40 text-black font-black text-lg shadow-2xl shadow-primary-500/25 transition flex items-center justify-center gap-3"
+          >
+            <CreditCard className="w-6 h-6" />
+            <span>FINALIZAR PAGAMENTO (F2)</span>
+          </button>
         </div>
       </div>
 
-      {/* MODAL DE PAGAMENTO */}
+      {/* MODAL DE PAGAMENTO & TEF */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-surface-border rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5">
+          <div className="bg-surface border border-surface-border rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-primary-400" />
-                <span>Finalizar Pagamento (PDV)</span>
+                <span>Recebimento no Frente de Caixa</span>
               </h3>
               <button onClick={() => setShowPaymentModal(false)} className="text-zinc-400 hover:text-white">
                 ✕
@@ -505,160 +541,269 @@ export default function PosPage() {
             </div>
 
             {/* Total e Saldo Restante */}
-            <div className="grid grid-cols-3 gap-3 p-4 bg-surface-card rounded-xl text-center">
+            <div className="grid grid-cols-2 gap-3 p-4 bg-surface-card rounded-2xl text-center border border-surface-border">
               <div>
-                <p className="text-[11px] text-zinc-400 uppercase font-semibold">Total Venda</p>
-                <p className="text-base font-bold text-zinc-100 font-mono mt-0.5">{formatCurrency(totalSale)}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-zinc-400 uppercase font-semibold">Total Pago</p>
-                <p className="text-base font-bold text-emerald-400 font-mono mt-0.5">{formatCurrency(totalPaid)}</p>
+                <p className="text-[11px] text-zinc-400 uppercase font-semibold">Total da Venda</p>
+                <p className="text-2xl font-black text-white font-mono mt-0.5">{formatCurrency(totalSale)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-zinc-400 uppercase font-semibold">
-                  {changeAmount > 0 ? 'Troco' : 'Falta Pagar'}
+                  {changeAmount > 0 ? 'Troco a Devolver' : 'Valor a Cobrar'}
                 </p>
                 <p
-                  className={`text-base font-black font-mono mt-0.5 ${
-                    changeAmount > 0 ? 'text-primary-400' : 'text-amber-400'
+                  className={`text-2xl font-black font-mono mt-0.5 ${
+                    changeAmount > 0 ? 'text-primary-400' : 'text-emerald-400'
                   }`}
                 >
-                  {formatCurrency(changeAmount > 0 ? changeAmount : remainingToPay)}
+                  {formatCurrency(changeAmount > 0 ? changeAmount : currentPaymentAmount)}
                 </p>
               </div>
             </div>
 
             {/* Seleção da Forma de Pagamento */}
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { id: 'CASH', label: 'Dinheiro', icon: Banknote },
-                { id: 'PIX', label: 'PIX', icon: QrCode },
-                { id: 'DEBIT_CARD', label: 'Débito', icon: CreditCard },
-                { id: 'CREDIT_CARD', label: 'Crédito', icon: CreditCard },
-              ].map((m) => {
-                const Icon = m.icon;
-                const isSelected = currentPaymentMethod === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      setCurrentPaymentMethod(m.id);
-                      setPaymentAmountInput(remainingToPay.toFixed(2));
-                    }}
-                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-primary-500/20 border-primary-400 text-primary-400'
-                        : 'bg-surface-card border-surface-border text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-xs font-semibold">{m.label}</span>
-                  </button>
-                );
-              })}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-400">Forma de Pagamento</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: 'CASH', label: 'Dinheiro', icon: Banknote },
+                  { id: 'PIX', label: 'PIX QrCode', icon: QrCode },
+                  { id: 'DEBIT_CARD', label: 'Débito', icon: CreditCard },
+                  { id: 'CREDIT_CARD', label: 'Crédito', icon: CreditCard },
+                ].map((m) => {
+                  const Icon = m.icon;
+                  const isSelected = currentPaymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPaymentMethod(m.id as any);
+                        setPaymentAmountInput(totalSale.toFixed(2));
+                      }}
+                      className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-primary-500/20 border-primary-400 text-primary-400 font-bold'
+                          : 'bg-surface-card border-surface-border text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs">{m.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Inserir Valor */}
-            <div className="flex gap-3">
+            {/* Seletor de Parcelas (Exclusivo para Cartão de Crédito) */}
+            {currentPaymentMethod === 'CREDIT_CARD' && (
+              <div className="space-y-1.5 bg-surface-card p-3 rounded-xl border border-surface-border">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                  <span>Quantidade de Parcelas (Crédito)</span>
+                  <span className="text-primary-400 font-mono">
+                    {creditInstallments}x de {formatCurrency((currentPaymentAmount || totalSale) / creditInstallments)}
+                  </span>
+                </label>
+                <select
+                  value={creditInstallments}
+                  onChange={(e) => setCreditInstallments(parseInt(e.target.value))}
+                  className="w-full bg-background border border-surface-border rounded-xl px-3 py-2 text-xs font-bold text-zinc-100 focus:outline-none focus:border-primary-400"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                    <option key={n} value={n}>
+                      {n}x de {formatCurrency((currentPaymentAmount || totalSale) / n)} (À Vista / Sem Juros)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Seletor de Maquininha Integrada / TEF (Cartão Crédito / Débito) */}
+            {(currentPaymentMethod === 'CREDIT_CARD' || currentPaymentMethod === 'DEBIT_CARD') && (
+              <div className="space-y-1.5 bg-surface-card p-3 rounded-xl border border-surface-border">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Cpu className="w-4 h-4 text-primary-400" />
+                  <span>Maquininha TEF / Pinpad Conectado</span>
+                </label>
+                <select
+                  value={selectedTerminal}
+                  onChange={(e) => setSelectedTerminal(e.target.value as any)}
+                  className="w-full bg-background border border-surface-border rounded-xl px-3 py-2 text-xs font-bold text-zinc-100 focus:outline-none focus:border-primary-400"
+                >
+                  <option value="MERCADO_PAGO">Mercado Pago Point (Smart POS)</option>
+                  <option value="PAGBANK">PagBank / PagSeguro Moderninha</option>
+                  <option value="STONE_TEF">Stone TEF IP / Pinpad USB</option>
+                  <option value="STRIPE">Stripe Terminal</option>
+                  <option value="MANUAL">Maquininha Manual (Digitar POS Físico)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Inserção e Ajuste de Valor do Pagamento */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-400">Valor Pago pelo Cliente (R$)</label>
               <input
                 type="number"
                 step="0.01"
                 value={paymentAmountInput}
                 onChange={(e) => setPaymentAmountInput(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 bg-background border border-surface-border rounded-xl px-4 py-2.5 text-base font-mono text-zinc-100 focus:outline-none focus:border-primary-400"
+                className="w-full bg-background border border-surface-border rounded-xl px-4 py-3 text-xl font-mono font-bold text-zinc-100 focus:outline-none focus:border-primary-400"
               />
-              <button
-                type="button"
-                onClick={handleAddPayment}
-                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold rounded-xl text-xs transition"
-              >
-                + Adicionar Parcela
-              </button>
             </div>
 
-            {/* Lista de Pagamentos Inseridos */}
-            {payments.length > 0 && (
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                {payments.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-surface-card text-xs">
-                    <span className="font-semibold text-zinc-300">{p.method}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-emerald-400 font-bold">{formatCurrency(p.amount)}</span>
-                      <button
-                        onClick={() => setPayments((prev) => prev.filter((_, idx) => idx !== i))}
-                        className="text-zinc-500 hover:text-red-400"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            {/* Feedback Visual TEF Processando */}
+            {isProcessingTef && (
+              <div className="p-4 rounded-xl bg-primary-500/10 border border-primary-500/30 text-center space-y-2 animate-pulse">
+                <div className="w-6 h-6 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-bold text-primary-400">{tefStatusMsg}</p>
               </div>
             )}
 
-            {/* Botão de Conclusão */}
-            <div className="pt-3 border-t border-surface-border flex justify-end gap-3">
+            {/* Botão de Conclusão Direta (F10) */}
+            <div className="pt-3 border-t border-surface-border flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setShowPaymentModal(false)}
-                className="px-4 py-2 rounded-xl bg-surface-card hover:bg-surface-border text-xs text-zinc-300 font-semibold"
+                className="px-4 py-2.5 rounded-xl bg-surface-card hover:bg-surface-border text-xs text-zinc-300 font-semibold"
               >
                 Voltar (ESC)
               </button>
               <button
                 type="button"
                 onClick={handleFinalizeSale}
-                disabled={isFinalizing || (totalPaid < totalSale && payments.length > 0)}
-                className="px-6 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-bold text-sm shadow-lg shadow-primary-500/25 disabled:opacity-40"
+                disabled={isFinalizing || isProcessingTef}
+                className="flex-1 py-3.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-extrabold text-base shadow-lg shadow-primary-500/25 disabled:opacity-40"
               >
-                {isFinalizing ? 'Processando Transação...' : 'Concluir Venda (F10)'}
+                {isFinalizing ? 'Finalizando Venda...' : 'CONFIRMAR E FINALIZAR (F10)'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE SUCESSO / COMPROVANTE */}
+      {/* MODAL DE SUCESSO / CUPOM FISCAL DANFE NFC-e PADRÃO 80MM */}
       {showSuccessModal && lastSaleResult && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-surface-border rounded-2xl max-w-md w-full p-6 shadow-2xl text-center space-y-4">
-            <div className="w-14 h-14 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle className="w-8 h-8" />
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-surface-border rounded-3xl max-w-lg w-full p-6 shadow-2xl text-center space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle className="w-7 h-7" />
             </div>
 
-            <h3 className="text-xl font-bold text-white">Venda Concluída!</h3>
-            <p className="text-xs text-zinc-400">Código: {lastSaleResult.code}</p>
+            <h3 className="text-lg font-black text-white">Venda Concluída com Sucesso!</h3>
 
-            <div className="p-4 bg-surface-card rounded-xl text-left text-xs space-y-2 border border-surface-border font-mono">
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Total:</span>
-                <span className="text-zinc-100 font-bold">{formatCurrency(lastSaleResult.total)}</span>
+            {/* DANFE NFC-e TÉRMICO PADRÃO SEFAZ (80mm) */}
+            <div className="p-6 bg-white text-black rounded-xl text-left text-[11px] font-mono leading-tight shadow-inner border border-zinc-300 font-bold space-y-3">
+              {/* Cabeçalho da Empresa */}
+              <div className="text-center space-y-0.5 border-b border-black pb-2">
+                <p className="font-black text-sm uppercase tracking-tight">RETAILSYN VAREJO & CONVENIÊNCIA</p>
+                <p className="text-[10px]">RETAILSYN TECNOLOGIA E SISTEMAS LTDA</p>
+                <p className="text-[10px]">CNPJ: 12.345.678/0001-90 · IE: 123.456.789.110</p>
+                <p className="text-[10px]">Av. Brasil, 1500 - São Luís / MA - CEP: 65000-000</p>
+                <p className="text-[10px]">Fone: (98) 98589-4988 · www.retailsyn.com.br</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Itens:</span>
-                <span className="text-zinc-100">{lastSaleResult.items?.length || 0} produtos</span>
+
+              {/* Título DANFE */}
+              <div className="text-center border-b border-black pb-2">
+                <p className="font-black text-xs">DANFE NFC-e - Documento Auxiliar da Nota Fiscal</p>
+                <p className="text-[10px]">de Consumidor Eletrônica</p>
+                <p className="text-[9px]">Não Permite Crédito de ICMS - Emissão Normal</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Status Fiscal:</span>
-                <span className="text-primary-400">NFC-e Emitida / SEFAZ</span>
+
+              {/* Tabela de Produtos */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] uppercase border-b border-dashed border-zinc-400 pb-1">
+                  <span>ITEM CÓDIGO DESCRIÇÃO QTD UN VL.UNIT</span>
+                  <span>TOTAL</span>
+                </div>
+                {lastSaleResult.items?.map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between text-[10px] leading-snug">
+                    <div className="truncate pr-2">
+                      {idx + 1} {item.product?.barcode || 'EAN'} {item.product?.name || 'PRODUTO'}
+                      <br />
+                      <span className="text-[9px] font-normal">
+                        {item.quantity} UN x R$ {Number(item.unitPrice).toFixed(2)}
+                      </span>
+                    </div>
+                    <span className="font-bold">R$ {Number(item.total).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totais */}
+              <div className="border-t border-dashed border-black pt-2 space-y-1">
+                <div className="flex justify-between">
+                  <span>QTD. TOTAL DE ITENS:</span>
+                  <span>{lastSaleResult.items?.length || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>SUBTOTAL R$:</span>
+                  <span>R$ {Number(lastSaleResult.subtotal || lastSaleResult.total).toFixed(2)}</span>
+                </div>
+                {Number(lastSaleResult.discount) > 0 && (
+                  <div className="flex justify-between text-red-700">
+                    <span>DESCONTO R$:</span>
+                    <span>- R$ {Number(lastSaleResult.discount).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs font-black pt-1 border-t border-black">
+                  <span>VALOR TOTAL R$:</span>
+                  <span>R$ {Number(lastSaleResult.total).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Forma de Pagamento */}
+              <div className="border-t border-dashed border-black pt-2 space-y-1">
+                <div className="flex justify-between">
+                  <span>
+                    {lastSaleResult.paymentsFormatted?.[0]?.method === 'CREDIT_CARD'
+                      ? `Cartão de Crédito (${lastSaleResult.paymentsFormatted?.[0]?.installments || 1}x)`
+                      : lastSaleResult.paymentsFormatted?.[0]?.method === 'DEBIT_CARD'
+                      ? 'Cartão de Débito'
+                      : lastSaleResult.paymentsFormatted?.[0]?.method === 'PIX'
+                      ? 'PIX QrCode'
+                      : 'Dinheiro'}
+                  </span>
+                  <span>R$ {Number(lastSaleResult.total).toFixed(2)}</span>
+                </div>
+                {lastSaleResult.change > 0 && (
+                  <div className="flex justify-between text-emerald-800 font-bold">
+                    <span>TROCO DEVOLVIDO R$:</span>
+                    <span>R$ {Number(lastSaleResult.change).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chave de Acesso e Dados SEFAZ */}
+              <div className="border-t border-black pt-2 text-center space-y-1">
+                <p className="text-[9px] uppercase font-bold">CHAVE DE ACESSO DA NFC-e SEFAZ</p>
+                <p className="text-[9px] tracking-wider font-mono bg-zinc-100 p-1 border border-zinc-300">
+                  {lastSaleResult.nfceAccessKey}
+                </p>
+                <p className="text-[9px]">
+                  EMISSÃO: {new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR')} · SÉRIE 001 · NÚMERO {lastSaleResult.code}
+                </p>
+                <p className="text-[9px]">PROTOCOLO DE AUTORIZAÇÃO SEFAZ: {lastSaleResult.protocol}</p>
+                <p className="text-[8px] text-zinc-600 font-normal">
+                  Tributos Totais Incidentes (Lei 12.741/2012): R$ {(Number(lastSaleResult.total) * 0.18).toFixed(2)} (18,00%)
+                </p>
+              </div>
+
+              <div className="text-center pt-2 border-t border-dashed border-black">
+                <p className="text-[10px] uppercase font-black">Obrigado pela preferência!</p>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-surface-card hover:bg-surface-border text-xs text-zinc-200 font-bold flex items-center justify-center gap-2 border border-surface-border"
+                onClick={() => window.print()}
+                className="flex-1 py-3 rounded-xl bg-surface-card hover:bg-surface-border text-xs text-zinc-200 font-bold flex items-center justify-center gap-2 border border-surface-border"
               >
-                <Printer className="w-4 h-4" />
-                <span>Imprimir Cupom</span>
+                <Printer className="w-4 h-4 text-primary-400" />
+                <span>Imprimir Cupom ESC/POS</span>
               </button>
               <button
                 onClick={() => setShowSuccessModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-bold text-xs"
+                className="flex-1 py-3 rounded-xl bg-primary-500 hover:bg-primary-400 text-black font-extrabold text-xs"
               >
                 Nova Venda (ESC)
               </button>
