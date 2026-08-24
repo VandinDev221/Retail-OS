@@ -29,27 +29,26 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    try {
-      const savedToken = localStorage.getItem('retail_os_token');
-      const savedUser = localStorage.getItem('retail_os_user');
-
-      if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('retail_os_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
       }
-    } catch (e) {
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-      }
-    } finally {
-      setLoading(false);
     }
-  }, []);
+    return null;
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('retail_os_token');
+    }
+    return null;
+  });
+
+  const [loading, setLoading] = useState(false);
 
   const login = async (data: { email: string; password: string; tenantSlug?: string }): Promise<UserProfile> => {
     const res = await api.post('/auth/login', data);
