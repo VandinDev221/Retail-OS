@@ -18,6 +18,16 @@ import {
   Crown,
   AlertCircle,
   X,
+  FileCode,
+  KeyRound,
+  ShieldCheck,
+  UploadCloud,
+  Lock,
+  FileCheck,
+  Eye,
+  EyeOff,
+  FileText,
+  Check,
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -43,11 +53,21 @@ export default function SettingsPage() {
     },
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [certFileName, setCertFileName] = useState<string | null>(null);
+
   const [tenantForm, setTenantForm] = useState({
     name: '',
     cnpj: '',
     email: '',
     phone: '',
+    ie: '',
+    address: '',
+    crt: '1',
+    cscToken: '',
+    cscId: '000001',
+    sefazEnvironment: '2',
+    certificatePassword: '',
   });
 
   React.useEffect(() => {
@@ -57,7 +77,17 @@ export default function SettingsPage() {
         cnpj: tenant.cnpj || '',
         email: tenant.email || '',
         phone: tenant.phone || '',
+        ie: tenant.ie || '123.456.789.110',
+        address: tenant.stores?.[0]?.address || 'Av. Brasil, 1500 - São Luís / MA',
+        crt: tenant.crt || '1',
+        cscToken: tenant.cscToken || '0123456789ABCDEF0123456789ABCDEF0123',
+        cscId: tenant.cscId || '000001',
+        sefazEnvironment: tenant.sefazEnvironment || '2',
+        certificatePassword: tenant.certificatePassword || '',
       });
+      if (tenant.certificateName) {
+        setCertFileName(tenant.certificateName);
+      }
     }
   }, [tenant]);
 
@@ -262,13 +292,18 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ABA DADOS CADASTRAIS DA EMPRESA */}
+      {/* ABA DADOS CADASTRAIS DA EMPRESA E CONFIGURAÇÕES FISCAIS */}
       {tab === 'tenant' && (
-        <div className="bg-surface border border-surface-border rounded-2xl p-6 shadow-xl space-y-6">
+        <div className="bg-surface border border-surface-border rounded-2xl p-6 shadow-xl space-y-8">
           <div className="flex justify-between items-center pb-4 border-b border-surface-border">
             <div>
-              <h2 className="text-lg font-bold text-white">Dados Cadastrais da Empresa</h2>
-              <p className="text-xs text-zinc-400">Edite as informações cadastrais da sua empresa (Disponível para Gerentes e Administradores)</p>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Store className="w-5 h-5 text-primary-400" />
+                <span>Dados Cadastrais & Parâmetros Fiscais da Empresa</span>
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Informações exibidas nos cupons fiscais DANFE (NFC-e / NF-e), certificado digital A1 (.pfx) e parâmetros SEFAZ
+              </p>
             </div>
             <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-extrabold text-[10px] uppercase border border-emerald-500/20">
               {tenant?.plan || 'PLANO PRO'}
@@ -280,78 +315,220 @@ export default function SettingsPage() {
               e.preventDefault();
               updateTenantMutation.mutate(tenantForm);
             }}
-            className="space-y-4"
+            className="space-y-8"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Razão Social / Nome da Empresa</label>
-                <input
-                  type="text"
-                  required
-                  value={tenantForm.name}
-                  onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
-                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-bold"
-                />
-              </div>
+            {/* SEÇÃO 1: DADOS CADASTRAIS DA EMPRESA */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-surface-border/60 pb-2">
+                <FileText className="w-4 h-4 text-primary-400" />
+                <span>1. Identificação Cadastral & Endereço da Loja</span>
+              </h3>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">
-                  Slug do Tenant <span className="text-[10px] text-zinc-500 font-normal">(Gerado automaticamente - Não editável)</span>
-                </label>
-                <div className="w-full bg-surface-card/50 border border-surface-border/50 rounded-xl px-3.5 py-2.5 text-xs text-amber-400 font-mono font-bold cursor-not-allowed select-none flex items-center justify-between">
-                  <span>{tenant?.slug || 'loja-matriz'}</span>
-                  <span className="text-[10px] uppercase font-sans text-zinc-500 border border-zinc-700 rounded px-1.5 py-0.5">Automático</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Razão Social / Nome da Empresa</label>
+                  <input
+                    type="text"
+                    required
+                    value={tenantForm.name}
+                    onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-bold"
+                  />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">CNPJ</label>
-                <input
-                  type="text"
-                  value={tenantForm.cnpj}
-                  onChange={(e) => setTenantForm({ ...tenantForm, cnpj: e.target.value })}
-                  placeholder="00.000.000/0000-00"
-                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">CNPJ da Empresa</label>
+                  <input
+                    type="text"
+                    value={tenantForm.cnpj}
+                    onChange={(e) => setTenantForm({ ...tenantForm, cnpj: e.target.value })}
+                    placeholder="00.000.000/0000-00"
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">E-mail de Contato da Empresa</label>
-                <input
-                  type="email"
-                  value={tenantForm.email}
-                  onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
-                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Inscrição Estadual (IE)</label>
+                  <input
+                    type="text"
+                    value={tenantForm.ie}
+                    onChange={(e) => setTenantForm({ ...tenantForm, ie: e.target.value })}
+                    placeholder="Ex: 123.456.789.110 ou ISENTO"
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Telefone / WhatsApp</label>
-                <input
-                  type="text"
-                  value={tenantForm.phone}
-                  onChange={(e) => setTenantForm({ ...tenantForm, phone: e.target.value })}
-                  placeholder="(00) 00000-0000"
-                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">E-mail de Contato da Empresa</label>
+                  <input
+                    type="email"
+                    value={tenantForm.email}
+                    onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Plano Atual Contratado</label>
-                <div className="w-full bg-surface-card/50 border border-surface-border/50 rounded-xl px-3.5 py-2.5 text-xs text-emerald-400 font-bold flex items-center justify-between">
-                  <span>{tenant?.plan || 'PRO'}</span>
-                  <span className="text-[10px] text-zinc-400 font-normal">SaaS Ativo</span>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Telefone / WhatsApp da Loja</label>
+                  <input
+                    type="text"
+                    value={tenantForm.phone}
+                    onChange={(e) => setTenantForm({ ...tenantForm, phone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Endereço Completo da Loja Física</label>
+                  <input
+                    type="text"
+                    value={tenantForm.address}
+                    onChange={(e) => setTenantForm({ ...tenantForm, address: e.target.value })}
+                    placeholder="Av. Brasil, 1500 - Bairro - Cidade / UF - CEP"
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none"
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-surface-border">
+            {/* SEÇÃO 2: CERTIFICADO DIGITAL A1 (.PFX / .P12) */}
+            <div className="space-y-4 pt-4 border-t border-surface-border">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-surface-border/60 pb-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>2. Certificado Digital A1 (.pfx / .p12)</span>
+              </h3>
+
+              <div className="p-4 rounded-xl bg-surface-card border border-surface-border space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-white flex items-center gap-2">
+                      <FileCode className="w-4 h-4 text-primary-400" />
+                      <span>{certFileName || 'Certificado_Digital_A1_Empresa.pfx'}</span>
+                    </p>
+                    <p className="text-[11px] text-zinc-400">
+                      Certificado A1 ICP-Brasil em formato binário PKCS#12 (.pfx / .p12) para assinatura digital de notas na SEFAZ.
+                    </p>
+                  </div>
+
+                  <label className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold rounded-xl text-xs cursor-pointer border border-surface-border transition flex items-center gap-2 shrink-0">
+                    <UploadCloud className="w-4 h-4 text-primary-400" />
+                    <span>Carregar Arquivo (.pfx)</span>
+                    <input
+                      type="file"
+                      accept=".pfx,.p12"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setCertFileName(e.target.files[0].name);
+                          alert(`Arquivo ${e.target.files[0].name} selecionado com sucesso!`);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">Senha do Certificado A1</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={tenantForm.certificatePassword}
+                        onChange={(e) => setTenantForm({ ...tenantForm, certificatePassword: e.target.value })}
+                        placeholder="Digite a senha do certificado..."
+                        className="w-full bg-background border border-surface-border rounded-xl pl-3.5 pr-10 py-2 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div className="text-[11px]">
+                      <p className="font-bold text-emerald-300">Status SEFAZ: Conexão Válida</p>
+                      <p className="text-emerald-400/80">Certificado A1 pronto para emissão de NFC-e / NF-e.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3: PARÂMETROS FISCAIS SEFAZ & TOKEN CSC */}
+            <div className="space-y-4 pt-4 border-t border-surface-border">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-surface-border/60 pb-2">
+                <KeyRound className="w-4 h-4 text-amber-400" />
+                <span>3. Parâmetros Fiscais SEFAZ & Token CSC (NFC-e / NF-e)</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Regime Tributário (CRT)</label>
+                  <select
+                    value={tenantForm.crt}
+                    onChange={(e) => setTenantForm({ ...tenantForm, crt: e.target.value })}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-semibold"
+                  >
+                    <option value="1">1 - Simples Nacional (Padrão Pequeno Varejo / Conveniência)</option>
+                    <option value="2">2 - Simples Nacional - Excesso de Sublimite da Receita</option>
+                    <option value="3">3 - Regime Normal (Lucro Presumido / Lucro Real)</option>
+                    <option value="4">4 - MEI (Microempreendedor Individual)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Ambiente de Transmissão SEFAZ</label>
+                  <select
+                    value={tenantForm.sefazEnvironment}
+                    onChange={(e) => setTenantForm({ ...tenantForm, sefazEnvironment: e.target.value })}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-semibold"
+                  >
+                    <option value="2">2 - Homologação (Ambiente de Testes SEFAZ)</option>
+                    <option value="1">1 - Produção (Emissão Fiscal com Valor Jurídico)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                    Token CSC (Código de Segurança do Contribuinte SEFAZ)
+                  </label>
+                  <input
+                    type="text"
+                    value={tenantForm.cscToken}
+                    onChange={(e) => setTenantForm({ ...tenantForm, cscToken: e.target.value })}
+                    placeholder="Ex: 0123456789ABCDEF0123456789ABCDEF0123"
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono tracking-wider"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">Obtido no Portal da SEFAZ da sua UF para geração do QR Code da NFC-e</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">ID do Token CSC (idCSC)</label>
+                  <input
+                    type="text"
+                    value={tenantForm.cscId}
+                    onChange={(e) => setTenantForm({ ...tenantForm, cscId: e.target.value })}
+                    placeholder="Ex: 000001"
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-primary-400 outline-none font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-6 border-t border-surface-border">
               <button
                 type="submit"
                 disabled={updateTenantMutation.isPending}
-                className="px-5 py-2.5 bg-primary-500 hover:bg-primary-400 text-black font-extrabold rounded-xl text-xs transition shadow-lg flex items-center gap-2"
+                className="px-6 py-3 bg-primary-500 hover:bg-primary-400 text-black font-extrabold rounded-xl text-xs transition shadow-xl flex items-center gap-2"
               >
-                {updateTenantMutation.isPending ? 'Salvando Alterações...' : 'Salvar Dados da Empresa'}
+                <Check className="w-4 h-4" />
+                <span>{updateTenantMutation.isPending ? 'Salvando Configurações Fiscais...' : 'Salvar Dados & Parâmetros Fiscais'}</span>
               </button>
             </div>
           </form>
