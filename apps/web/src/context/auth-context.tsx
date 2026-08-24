@@ -57,9 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(accessToken);
     setUser(userData);
 
-    localStorage.setItem('retail_os_token', accessToken);
-    localStorage.setItem('retail_os_refresh_token', refreshToken);
-    localStorage.setItem('retail_os_user', JSON.stringify(userData));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('retail_os_token', accessToken);
+        localStorage.setItem('retail_os_refresh_token', refreshToken);
+        localStorage.setItem('retail_os_user', JSON.stringify(userData));
+      } catch (e) {}
+    }
     return userData;
   };
 
@@ -73,9 +77,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(accessToken);
     setUser(userData);
 
-    localStorage.setItem('retail_os_token', accessToken);
-    localStorage.setItem('retail_os_refresh_token', refreshToken);
-    localStorage.setItem('retail_os_user', JSON.stringify(userData));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('retail_os_token', accessToken);
+        localStorage.setItem('retail_os_refresh_token', refreshToken);
+        localStorage.setItem('retail_os_user', JSON.stringify(userData));
+      } catch (e) {}
+    }
     return { user: userData };
   };
 
@@ -89,19 +97,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(accessToken);
     setUser(userData);
 
-    localStorage.setItem('retail_os_token', accessToken);
-    localStorage.setItem('retail_os_refresh_token', refreshToken);
-    localStorage.setItem('retail_os_user', JSON.stringify(userData));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('retail_os_token', accessToken);
+        localStorage.setItem('retail_os_refresh_token', refreshToken);
+        localStorage.setItem('retail_os_user', JSON.stringify(userData));
+      } catch (e) {}
+    }
     return { user: userData };
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('retail_os_token');
-    localStorage.removeItem('retail_os_refresh_token');
-    localStorage.removeItem('retail_os_user');
-    window.location.href = '/login';
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('retail_os_token');
+        localStorage.removeItem('retail_os_refresh_token');
+        localStorage.removeItem('retail_os_user');
+      } catch (e) {}
+      window.location.href = '/login';
+    }
   };
 
   const hasPermission = (permission: string) => {

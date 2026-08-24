@@ -18,9 +18,13 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('retail_os_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = localStorage.getItem('retail_os_token');
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (e) {
+      // ignore
     }
   }
   return config;
@@ -36,23 +40,34 @@ api.interceptors.response.use(
       typeof window !== 'undefined'
     ) {
       originalRequest._retry = true;
-      const refreshToken = localStorage.getItem('retail_os_refresh_token');
+      let refreshToken = null;
+      try {
+        refreshToken = localStorage.getItem('retail_os_refresh_token');
+      } catch (e) {
+        refreshToken = null;
+      }
 
       if (refreshToken) {
         try {
           const res = await axios.post(`${baseURL}/auth/refresh`, { refreshToken });
           const newToken = res.data.accessToken;
-          localStorage.setItem('retail_os_token', newToken);
+          try {
+            localStorage.setItem('retail_os_token', newToken);
+          } catch (e) {}
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } catch (refreshErr) {
-          localStorage.clear();
+          try {
+            localStorage.clear();
+          } catch (e) {}
           if (!window.location.pathname.includes('/login')) {
             window.location.href = '/login';
           }
         }
       } else {
-        localStorage.clear();
+        try {
+          localStorage.clear();
+        } catch (e) {}
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }

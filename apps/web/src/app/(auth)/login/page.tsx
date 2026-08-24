@@ -127,15 +127,19 @@ export default function LoginPage() {
         password, 
         tenantSlug: tenantSlug.trim() || undefined 
       });
-      if (loggedUser?.role === 'SUPER_ADMIN') {
-        router.push('/super-admin');
-      } else if (loggedUser?.role === 'CAIXA') {
-        router.push('/pos');
-      } else {
-        router.push('/dashboard');
+
+      if (typeof window !== 'undefined') {
+        if (loggedUser?.role === 'SUPER_ADMIN') {
+          window.location.href = '/super-admin';
+        } else if (loggedUser?.role === 'CAIXA') {
+          window.location.href = '/pos';
+        } else {
+          window.location.href = '/dashboard';
+        }
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'E-mail ou senha incorretos.');
+      console.error('Login submit error:', err);
+      setError(err?.response?.data?.message || err?.message || 'E-mail ou senha incorretos.');
     } finally {
       setLoading(false);
     }
@@ -160,9 +164,9 @@ export default function LoginPage() {
       if (res?.checkoutUrl) {
         window.location.href = res.checkoutUrl;
       } else if (res?.user?.role === 'SUPER_ADMIN') {
-        router.push('/super-admin');
+        window.location.href = '/super-admin';
       } else {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Erro ao cadastrar empresa.');
@@ -192,9 +196,9 @@ export default function LoginPage() {
             if (res?.checkoutUrl) {
               window.location.href = res.checkoutUrl;
             } else if (res?.user?.role === 'SUPER_ADMIN') {
-              router.push('/super-admin');
+              window.location.href = '/super-admin';
             } else {
-              router.push('/');
+              window.location.href = '/dashboard';
             }
           } catch (err: any) {
             setError(err?.response?.data?.message || 'Erro ao autenticar com a conta Google.');
@@ -223,7 +227,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 my-8">
+    <div 
+      className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col justify-center items-center p-4"
+      style={{ backgroundColor: '#090A0F', color: '#F1F3F9' }}
+    >
       {/* Background Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl pointer-events-none" />
 
